@@ -245,6 +245,7 @@ body.readonly .readonly-badge{display:inline-block;}
 <div class="modal-mask show" id="loginGate" style="align-items:center;z-index:300;">
   <div class="modal-sheet" style="border-radius:20px;max-width:340px;">
     <h3 style="text-align:center;">🔥 燒酒烤烤豬叫貨系統</h3>
+    <div id="loginLoadingHint" style="text-align:center;color:var(--gray);font-size:13px;margin-bottom:10px;">資料載入中，請稍候…</div>
     <div class="field-row"><label>帳號</label><input type="text" id="loginAccount" placeholder="請輸入帳號" inputmode="text"></div>
     <div class="field-row"><label>密碼</label><input type="password" id="loginPassword" placeholder="請輸入密碼" inputmode="numeric"></div>
     <div id="loginError" style="color:var(--warn);font-size:13px;text-align:center;margin-bottom:8px;display:none;">帳號或密碼錯誤</div>
@@ -371,12 +372,16 @@ body.readonly .readonly-badge{display:inline-block;}
     <div class="field-row"><label>密碼（建議4-6位數字）</label><input type="text" id="newAccPassword" placeholder="例如：1234"></div>
     <div class="field-row"><label>姓名</label><input type="text" id="newAccName" placeholder="例如：陳店長"></div>
     <div class="field-row"><label>角色</label>
-      <select id="newAccRole">${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+      <select id="newAccRole"></select>
     </div>
     <button class="icon-btn" style="width:100%;" onclick="addAccount()">＋新增帳號</button>
   </div>
 
   <div class="page-title" style="margin-top:18px;">供應商管理</div>
+  <div class="card" id="importCard" style="display:none;">
+    <div style="font-size:13px;margin-bottom:8px;">客戶提供的完整供應商名單（23家、249項品項）已內建在系統裡，按下方按鈕一次匯入。已存在的供應商/品項不會重複新增，可以放心多按幾次。</div>
+    <button class="icon-btn" style="width:100%;" onclick="importFullSupplierList()">📥 一鍵匯入完整供應商名單</button>
+  </div>
   <div class="card" id="adminSupplierList"></div>
 
   <div class="page-title" style="margin-top:18px;">單價異動紀錄</div>
@@ -414,6 +419,304 @@ body.readonly .readonly-badge{display:inline-block;}
    烤烤豬叫貨系統 － Phase 1 前端原型
    資料層：localStorage（真實部署後可換成後端API，介面呼叫不用大改）
    ========================================================= */
+
+const FULL_SUPPLIER_IMPORT = [
+  { name:'韓濟名味品有限公司', items:[
+    {name:'真露-青葡萄燒酒360ML', unit:'20瓶/箱', price:1980},
+    {name:'優格風味燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2080},
+    {name:'水蜜桃燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2050},
+    {name:'初飲初樂-蘋果', unit:'20瓶/箱', price:2000},
+    {name:'海太水梨汁238ML', unit:'72瓶/箱', price:1560},
+    {name:'海太葡萄汁238ML', unit:'72瓶/箱', price:1500},
+    {name:'CASS啤酒640ML', unit:'12瓶/箱', price:715},
+    {name:'JINRO真露復古風燒酒360ML', unit:'20瓶/箱', price:1900},
+    {name:'清露-蜂蜜梅子燒酒360ML', unit:'20瓶/箱', price:1700},
+    {name:'清露-蜂蜜芭樂燒酒360ML', unit:'20瓶/箱', price:1700},
+    {name:'韓國TERRA啤酒500ML', unit:'12瓶/箱', price:780},
+    {name:'SAERO初飲初樂新燒酒(九尾狐)', unit:'20瓶/箱', price:1610},
+    {name:'初飲初樂-荔枝燒酒360ML', unit:'20瓶/箱', price:2050},
+    {name:'清露-蜂蜜蘋果燒酒360ML', unit:'20瓶/箱', price:1700},
+    {name:'芸豆罐頭', unit:'420g/罐', price:50},
+    {name:'湯醬油', unit:'1.7L/瓶', price:180},
+    {name:'韓國蘋果醋', unit:'1.8L/瓶', price:150},
+    {name:'歡滿醋', unit:'1.8L/瓶', price:161},
+    {name:'玉米麥芽糖', unit:'2.45k/瓶', price:160},
+    {name:'大州香油', unit:'1.8L/罐', price:620},
+    {name:'黃豆醬(味噌)', unit:'14kg/桶', price:1038},
+    {name:'蔬菜 調味醬(沾醬)', unit:'14kg/桶', price:968},
+    {name:'大象清境園(順昌)辣椒醬', unit:'桶', price:888},
+    {name:'梅子濃縮液', unit:'1050ml/罐', price:316},
+    {name:'韓式辣椒粉(細)', unit:'3kg/包', price:798},
+    {name:'頂極真味牛肉調味粉', unit:'1kg/包', price:220},
+    {name:'綜合海鮮調味粉', unit:'1kg/包', price:258},
+    {name:'不倒翁-乾麵', unit:'110g*5入/袋', price:440},
+    {name:'韓式胡椒粉', unit:'200g/包', price:132},
+    {name:'泡菜', unit:'10kg/箱', price:1050},
+    {name:'頂級韓國生蝦醬', unit:'1Kg/罐', price:339},
+    {name:'年糕條', unit:'1.8kg/包', price:189},
+    {name:'釜山甜不辣(魚板)', unit:'1kg/包', price:150},
+    {name:'頂極海苔絲', unit:'1kg/包', price:700},
+    {name:'LOTTE韓式火腿', unit:'340g/盒', price:85},
+    {name:'蜂蜜柚子茶', unit:'1瓶', price:302},
+    {name:'辛辣粉', unit:'罐', price:230},
+    {name:'3號陶鍋', unit:'一箱20個', price:2980},
+    {name:'黑麵醬', unit:'罐', price:320},
+    {name:'七甲拌涼麵', unit:'包', price:155},
+    {name:'清正魚露', unit:'1kg/瓶', price:150},
+    {name:'蘋果醬', unit:'950克罐', price:237},
+    {name:'石鍋拌飯(16cm)', unit:'個', price:510},
+    {name:'石鍋拌飯15公分', unit:'個', price:484},
+    {name:'辣牛肉（校洞）500克）', unit:'包', price:92.34},
+    {name:'芝心年糕條', unit:'包', price:190},
+    {name:'韓式專業豆腐條', unit:'包', price:25},
+    {name:'山菜（蕨菜干）', unit:'片', price:160},
+    {name:'蔘雞湯', unit:'包', price:190},
+    {name:'清淨園煎餅粉', unit:'1kg/12包/箱', price:75},
+    {name:'寬冬粉', unit:'公斤', price:126},
+  ]},
+  { name:'盛豐行', items:[
+    {name:'金牌啤酒', unit:'12瓶/箱', price:584},
+    {name:'18生', unit:'20瓶/箱', price:1340},
+    {name:'可樂-330ml', unit:'24瓶/箱', price:340},
+    {name:'雪碧-330ml', unit:'24瓶/箱', price:340},
+  ]},
+  { name:'寶強', items:[
+    {name:'白色毛巾抹布(長)', unit:'包', price:300},
+    {name:'黃色海綿菜瓜布', unit:'包', price:40},
+    {name:'B700 淺盒/蓋', unit:'組', price:250},
+    {name:'大捲廁所衛生紙', unit:'箱', price:500},
+    {name:'沙拉脫', unit:'罐', price:60},
+    {name:'漂白水', unit:'罐', price:65},
+    {name:'超力除油靈', unit:'箱', price:1200},
+    {name:'瓦斯罐', unit:'組', price:120},
+    {name:'保鮮膜(200尺)', unit:'條', price:70},
+    {name:'4兩內袋', unit:'包', price:35},
+    {name:'半斤內袋', unit:'包', price:35},
+    {name:'1斤內袋', unit:'包', price:35},
+    {name:'3斤內袋', unit:'包', price:35},
+    {name:'5斤內袋', unit:'包', price:35},
+    {name:'10斤內袋', unit:'包', price:35},
+    {name:'260湯碗', unit:'條', price:55},
+    {name:'260湯碗+蓋', unit:'組', price:80},
+    {name:'RBC03B黑色扣盒', unit:'箱', price:2550},
+    {name:'RBC03B扣盒中層', unit:'箱', price:1200},
+    {name:'1.5盎司醬料杯', unit:'組', price:110},
+    {name:'2盎司醬料杯(高)', unit:'組', price:100},
+    {name:'阿湯哥湯匙', unit:'包', price:40},
+    {name:'套筷', unit:'包', price:50},
+    {name:'擦手紙', unit:'箱', price:500},
+    {name:'濕紙巾(扁長)', unit:'箱', price:550},
+    {name:'9*9百盒餐巾紙', unit:'箱', price:430},
+    {name:'龍頭牌1斤背心袋(全白)', unit:'包', price:30},
+    {name:'龍頭牌5斤背心袋(全白)', unit:'包', price:30},
+    {name:'M-8-2牛皮紙袋', unit:'50入/捆', price:300},
+    {name:'黑色焦炭菜瓜布', unit:'包', price:100},
+    {name:'男用洗碗手套(素色8號半)', unit:'雙', price:50},
+    {name:'女用洗碗手套(雙色7號半)', unit:'雙', price:35},
+    {name:'紅垃圾袋(小)', unit:'捲', price:80},
+    {name:'灰垃圾袋(大)', unit:'袋', price:1375},
+    {name:'鋁箔紙', unit:'條', price:110},
+    {name:'手扒雞手套', unit:'盒', price:30},
+    {name:'塑膠牙籤單包裝', unit:'盒', price:200},
+    {name:'45*500大保鮮膜', unit:'捲', price:700},
+    {name:'紙試飲杯', unit:'條', price:15},
+    {name:'內場乳膠手套(L)', unit:'盒', price:300},
+    {name:'520紙碗/蓋', unit:'組', price:105},
+  ]},
+  { name:'巨無霸冰品', items:[
+    {name:'香草牛奶粉', unit:'20包/箱', price:4000},
+  ]},
+  { name:'綦盛號菜商', items:[
+    {name:'粉蔥', unit:'斤', price:105},
+    {name:'黃豆芽', unit:'斤', price:17},
+    {name:'冷凍毛豆', unit:'包', price:95},
+    {name:'糯米椒', unit:'斤', price:105},
+    {name:'無籽綠檸檬', unit:'斤', price:48},
+    {name:'紫洋蔥', unit:'斤', price:55},
+    {name:'紫高麗菜 (生菜沙拉)', unit:'斤', price:45},
+    {name:'西生菜 (生菜沙拉)', unit:'斤', price:92},
+    {name:'蘿蔓生菜 (生菜沙拉)', unit:'斤', price:125},
+    {name:'雞胸骨', unit:'斤', price:12},
+    {name:'白蘿蔔', unit:'斤', price:25},
+    {name:'紅蘿蔔', unit:'斤', price:25},
+    {name:'紅辣椒', unit:'斤', price:110},
+    {name:'綠辣椒', unit:'斤', price:110},
+    {name:'小辣椒', unit:'斤', price:115},
+    {name:'大蒜仁', unit:'斤', price:95},
+    {name:'小蒜仁', unit:'斤', price:75},
+    {name:'蒜泥 (斤/包)', unit:'斤', price:72},
+    {name:'鮮蚵', unit:'斤', price:135},
+    {name:'特大蛤蜊', unit:'斤', price:140},
+    {name:'蜆仔', unit:'斤', price:95},
+    {name:'高山高麗菜 (炸醬麵)', unit:'斤', price:35},
+    {name:'進口洋芋 (炸醬麵)', unit:'斤', price:45},
+    {name:'山東白菜 (部隊鍋)', unit:'斤', price:35},
+    {name:'金針菇 (部隊鍋)', unit:'包', price:15},
+    {name:'薑泥（部隊醬）', unit:'斤', price:90},
+    {name:'中華豆腐', unit:'盒', price:17},
+    {name:'板豆腐', unit:'板', price:60},
+    {name:'油菜', unit:'斤', price:32},
+    {name:'綠豆芽', unit:'斤', price:12},
+    {name:'小黃瓜', unit:'斤', price:60},
+    {name:'中薑', unit:'斤', price:170},
+    {name:'拉麵(細)', unit:'斤', price:40},
+    {name:'進口水菜', unit:'斤', price:50},
+    {name:'小韭菜', unit:'斤', price:108},
+    {name:'進口洋蔥', unit:'斤', price:33},
+    {name:'紅薯(地瓜)', unit:'斤', price:33},
+    {name:'杏鮑菇', unit:'斤', price:87},
+    {name:'生香菇', unit:'斤', price:140},
+    {name:'特大生香菇', unit:'斤', price:155},
+    {name:'鳳梨', unit:'斤', price:50},
+    {name:'蘋果', unit:'斤', price:20},
+    {name:'水梨', unit:'斤', price:110},
+    {name:'特大洋菇(盒)', unit:'斤', price:240},
+    {name:'洋菇(盒)', unit:'盒', price:98},
+    {name:'巴西里', unit:'斤', price:95},
+    {name:'進口准山', unit:'斤', price:142},
+    {name:'帶皮玉米筍', unit:'斤', price:75},
+    {name:'綠節瓜', unit:'斤', price:72},
+    {name:'大陸妹A', unit:'斤', price:43},
+    {name:'鮮絞肉', unit:'斤', price:110},
+    {name:'豬板油', unit:'斤', price:58},
+    {name:'大里肌', unit:'斤', price:158},
+    {name:'肩甲排 (不砍)', unit:'斤', price:110},
+    {name:'去皮五花肉(切0.2cm)', unit:'斤', price:190},
+    {name:'帶皮五花肉(切0.4cm)', unit:'斤', price:190},
+    {name:'去皮台灣紅蔥頭', unit:'兩', price:90},
+    {name:'去皮五花肉', unit:'斤', price:180},
+    {name:'小腸', unit:'斤', price:65},
+    {name:'肝連', unit:'斤', price:150},
+    {name:'大腸頭', unit:'條', price:146},
+    {name:'大腸', unit:'斤', price:65},
+    {name:'檸檬原汁（柚子醬）', unit:'1罐', price:160},
+    {name:'櫻花蝦', unit:'斤', price:620},
+  ]},
+  { name:'佩森肉舖', items:[
+    {name:'純淨五花肉切2.5公分', unit:'公斤', price:483},
+    {name:'純淨豬梅花', unit:'公斤', price:387},
+  ]},
+  { name:'台益食品行', items:[
+    {name:'海帶芽半斤1包', unit:'斤', price:250},
+  ]},
+  { name:'品饌股份有限公司', items:[
+    {name:'T9帶骨清腿', unit:'公斤', price:185},
+    {name:'T9去骨腿肉(去環)', unit:'公斤', price:230},
+  ]},
+  { name:'國豐商行有限公司', items:[
+    {name:'精鹽(台鹽)', unit:'1Kg/包', price:17},
+    {name:'沙拉油(大成)', unit:'18L/桶', price:1010},
+    {name:'細砂糖', unit:'1.8kg/包', price:70},
+    {name:'太白粉', unit:'斤', price:60},
+    {name:'米酒', unit:'瓶', price:15},
+    {name:'金蘭(淡色)醬油', unit:'1.5L/桶', price:115},
+    {name:'柴魚精(烹大師)', unit:'1Kg/盒', price:290},
+    {name:'烏斯特辣醬油(進口)', unit:'295ml/罐', price:160},
+    {name:'是拉叉辣椒醬', unit:'680g/罐', price:80},
+    {name:'洋香菜葉(小磨坊)(包)', unit:'250g/包', price:355},
+    {name:'起司片(紅.安佳)', unit:'條', price:345},
+    {name:'白芝麻(熟)', unit:'斤', price:105},
+    {name:'鮮味炒手', unit:'罐', price:160},
+    {name:'日本味霖', unit:'1.8L/桶', price:155},
+    {name:'雞粉(康寶)2.2kg', unit:'包', price:460},
+    {name:'蛤精粉', unit:'盒', price:270},
+    {name:'番茄醬(可果美)', unit:'桶', price:190},
+    {name:'味精', unit:'包', price:85},
+    {name:'蜂蜜', unit:'3KG/桶', price:145},
+    {name:'黑胡椒粉(小磨坊)', unit:'包', price:315},
+    {name:'墨西哥青椒 切片', unit:'桶', price:260},
+    {name:'白胡椒粉(小磨坊)', unit:'盒', price:155},
+    {name:'開陽', unit:'包', price:300},
+    {name:'耐炸酥油(美食家)', unit:'桶', price:950},
+    {name:'芥末醬(大)', unit:'罐', price:305},
+    {name:'玉米粒', unit:'桶', price:24},
+    {name:'米酒頭0.6L/瓶', unit:'瓶', price:155},
+    {name:'李錦記熊貓蠔油', unit:'瓶', price:85},
+    {name:'二砂糖', unit:'公斤', price:35},
+    {name:'冰糖細', unit:'公斤', price:160},
+    {name:'紅棗', unit:'600克包', price:65},
+    {name:'枸紀', unit:'600克包', price:220},
+    {name:'糖粉', unit:'450G包', price:40},
+    {name:'老抽', unit:'罐', price:105},
+    {name:'金蘭醬油膏', unit:'罐', price:50},
+    {name:'洗衣粉10公斤袋', unit:'袋', price:280},
+    {name:'桂冠沙拉（冷藏）500克', unit:'包', price:85},
+    {name:'鮮奶油-麥斯馬汀', unit:'瓶', price:115},
+    {name:'佶子醬（玉英牌）550克瓶', unit:'瓶', price:210},
+    {name:'香蒜粒（玻璃瓶）小磨坊29克', unit:'罐', price:45},
+    {name:'低筋麵粉', unit:'斤', price:35},
+    {name:'十穀米（3公斤/包）', unit:'包', price:425},
+    {name:'黑胡椒圓粒松賀450克', unit:'包', price:230},
+    {name:'太白粉風車25公斤', unit:'袋', price:1480},
+  ]},
+  { name:'日本火腿', items:[
+    {name:'濃厚豚骨白湯HK-18(10包/1公斤)', unit:'箱', price:1995},
+  ]},
+  { name:'春發成實業有限公司', items:[
+    {name:'五花肉不帶皮', unit:'kg', price:520},
+    {name:'梅花肉', unit:'kg', price:615},
+    {name:'松阪肉', unit:'kg', price:1304},
+  ]},
+  { name:'源鮮農業', items:[
+    {name:'圓葉芝麻葉/300g', unit:'包', price:480},
+    {name:'義大利綠精靈/600g', unit:'包', price:270},
+    {name:'紅捲萵苣/600g', unit:'包', price:270},
+    {name:'紅酸模/100g', unit:'盒', price:160},
+  ]},
+  { name:'究好豬', items:[
+    {name:'五花肉3mm-切尾', unit:'Kg', price:330},
+    {name:'梅花肉', unit:'KG', price:300},
+    {name:'松阪豬', unit:'KG', price:600},
+  ]},
+  { name:'米屋智農股份有限公司', items:[
+    {name:'大橋CAS好米(台南11號)', unit:'3kg/包', price:165},
+  ]},
+  { name:'聖興軒食品有限公司', items:[
+    {name:'德式香腸人造衣', unit:'包', price:255},
+    {name:'特製培根(切)', unit:'KG', price:229},
+    {name:'寶宏雙色絲', unit:'包', price:240},
+  ]},
+  { name:'蛋商', items:[
+    {name:'雞蛋(20斤)', unit:'箱', price:980},
+  ]},
+  { name:'裕賀食品股份有限公司(牛肉商)', items:[
+    {name:'美國台塑牛小排', unit:'公斤', price:647.62},
+    {name:'美國特選肩小排', unit:'公斤', price:619.05},
+    {name:'美國帶油胸腹火鍋片', unit:'公斤', price:280.95},
+  ]},
+  { name:'陞輝食品(小農)', items:[
+    {name:'小農松坂肉', unit:'kg', price:605},
+    {name:'運費', unit:'次', price:289},
+  ]},
+  { name:'開店大師企業股份有限公司', items:[
+    {name:'酥脆卡脆粉-1(7.5Kg/包-4包/箱)', unit:'箱', price:2228.14},
+    {name:'外沾粉0303-3(15kg/包-2包/箱)', unit:'箱', price:2142.86},
+  ]},
+  { name:'高麗國泡菜', items:[
+    {name:'韓式泡菜(2700克)', unit:'包', price:370},
+  ]},
+  { name:'黑芝麻醬', items:[
+    {name:'黑芝麻醬(3公斤/6桶)', unit:'箱', price:4336.98},
+  ]},
+  { name:'高雄水產', items:[
+    {name:'單凍透抽21/25', unit:'kg', price:490},
+    {name:'運費', unit:'次', price:300},
+  ]},
+  { name:'尚誠國際有限公司', items:[
+    {name:'9分半蛤蠣', unit:'斤', price:125},
+    {name:'大蜆', unit:'斤', price:100},
+    {name:'盒卷(一排3-5隻/盒)', unit:'盒', price:125},
+    {name:'魷魚清肉(10公斤)', unit:'箱', price:245},
+    {name:'珍珠魚卵(500g/盒)', unit:'盒', price:180},
+    {name:'松葉蟹膏(300g/包)', unit:'包', price:550},
+    {name:'北海道日本干貝-4S(51-60顆/盒)', unit:'Kg', price:1620},
+    {name:'南美白蝦50/60', unit:'盒', price:190},
+    {name:'天使紅蝦', unit:'盒', price:420},
+    {name:'草蝦370g/8P', unit:'盒', price:205},
+    {name:'薄鹽鯖魚(4kg/21p/箱)', unit:'Kg', price:400},
+    {name:'透抽21/25-片涷', unit:'片', price:3882},
+  ]},
+];
 
 const DB_KEY = 'kklz_order_system_v1';
 const GAS_URL_KEY = 'kklz_gas_url';
@@ -484,15 +787,16 @@ function pushToCloud(){
 }
 function pullFromCloud(showMsg){
   const url = getGasUrl();
-  if(!url){ if(showMsg) showToast('尚未設定雲端網址'); return; }
+  if(!url){ if(showMsg) showToast('尚未設定雲端網址'); return Promise.resolve(); }
   setSyncStatus('syncing');
-  fetch(url).then(r=>r.json()).then(res=>{
+  return fetch(url).then(r=>r.json()).then(res=>{
     if(res && res.ok && res.data){
       try{
         const remote = JSON.parse(res.data);
         db = remote;
         saveDBLocalOnly();
-        renderAll(); applySettings(); renderLicenseBanner(); renderLicenseGate();
+        applySettings();
+        if(currentAccount){ renderAll(); renderLicenseBanner(); renderLicenseGate(); }
         setSyncStatus('synced');
         if(showMsg) showToast('已從雲端載入最新資料');
       }catch(e){ setSyncStatus('error'); }
@@ -1311,6 +1615,7 @@ function renderAdmin(){
   renderCloudSyncCard();
   renderAccountManage();
   renderLicensePanel();
+  document.getElementById('importCard').style.display = isMaintainer() ? 'block' : 'none';
   fillSettingsForm();
   document.getElementById('settingShopName').disabled = isReadonly();
   document.getElementById('settingAppSub').disabled = isReadonly();
@@ -1345,6 +1650,30 @@ function deleteSupplier(id){
   showToast('已刪除供應商');
 }
 
+/* ---------- 匯入完整供應商名單（客戶提供的彙整檔） ---------- */
+function importFullSupplierList(){
+  if(!isMaintainer()){ showToast('只有維護專員能匯入名單'); return; }
+  let addedSuppliers = 0, addedItems = 0, skippedItems = 0;
+  FULL_SUPPLIER_IMPORT.forEach(group=>{
+    let supplier = db.suppliers.find(s=>s.name===group.name);
+    if(!supplier){
+      supplier = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name:group.name, freq:0};
+      db.suppliers.push(supplier);
+      addedSuppliers++;
+    }
+    group.items.forEach(it=>{
+      const exists = db.items.some(x=>x.supplierId===supplier.id && x.name===it.name);
+      if(exists){ skippedItems++; return; }
+      db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*10000), supplierId:supplier.id,
+        code:'', name:it.name, unit:it.unit, price:it.price});
+      addedItems++;
+    });
+  });
+  saveDB();
+  renderAdmin(); renderSupplierList();
+  showToast(`匯入完成：新增${addedSuppliers}家供應商、${addedItems}項品項（略過${skippedItems}項重複）`);
+}
+
 /* ---------- 帳號管理（僅維護專員） ---------- */
 function renderAccountManage(){
   const wrap = document.getElementById('accountManageList');
@@ -1355,6 +1684,10 @@ function renderAccountManage(){
     return;
   }
   formWrap.style.display = 'block';
+  const roleSel = document.getElementById('newAccRole');
+  if(roleSel && roleSel.options.length===0){
+    roleSel.innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
+  }
   wrap.innerHTML = db.accounts.map(a=>`
     <div class="supplier-manage-item">
       <span>${escapeHtml(a.name)}（${escapeHtml(a.role)}）<br>
@@ -1407,12 +1740,20 @@ function renderAll(){
 }
 
 /* ---------- 初始化 ---------- */
-applySettings();
-renderSupplierList();
-if(getGasUrl()){ pullFromCloud(false); } else { setSyncStatus('offline'); }
-initLogin();
-renderLicenseBanner();
-renderLicenseGate();
+async function initApp(){
+  applySettings();
+  if(getGasUrl()){
+    await pullFromCloud(false); // 等雲端資料真的到齊，登入驗證才會用到最新帳號清單
+  } else {
+    setSyncStatus('offline');
+  }
+  const hint = document.getElementById('loginLoadingHint');
+  if(hint) hint.style.display = 'none';
+  initLogin(); // 登入成功後（loginAsAccount內）才會渲染供應商/訂單等業務資料
+  renderLicenseBanner();
+  renderLicenseGate();
+}
+initApp();
 </script>
 </body>
 </html>
