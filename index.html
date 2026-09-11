@@ -949,14 +949,37 @@ function renderLicensePanel(){
       <div class="log-row" style="color:var(--gray);">收費方案內容僅「維護專員」身份可查看</div>`;
     return;
   }
+  const actDateVal = new Date(lic.activationDate).toISOString().slice(0,10);
+  const paidThroughVal = lic.paidThroughDate ? new Date(lic.paidThroughDate).toISOString().slice(0,10) : '';
   wrap.innerHTML = `
     <div class="log-row"><b>目前狀態：</b>${statusLabel}</div>
-    <div class="log-row"><b>啟用日期：</b>${new Date(lic.activationDate).toLocaleDateString('zh-TW')}</div>
-    <div class="log-row"><b>試用期：</b>${lic.trialDays} 天</div>
-    <div class="log-row"><b>收費方案：</b>設定費 NTD ${lic.setupFee}（種子客戶價）＋月費 NTD ${lic.monthlyFee}／月，${lic.billingCycle}，首年前${lic.freeMonthsFirstYear}個月免收月費</div>
-    ${lic.paidThroughDate?`<div class="log-row"><b>已繳費至：</b>${new Date(lic.paidThroughDate).toLocaleDateString('zh-TW')}</div>`:''}
-    <button class="icon-btn" style="width:100%;margin-top:8px;" onclick="activateOrRenewLicense()">✓ 標記已收費並開通／續約一年</button>
+    <div class="field-row"><label>啟用日期</label><input type="date" id="licActDate" value="${actDateVal}"></div>
+    <div class="field-row"><label>試用天數</label><input type="number" id="licTrialDays" value="${lic.trialDays}"></div>
+    <div class="field-row"><label>設定費 NTD</label><input type="number" id="licSetupFee" value="${lic.setupFee}"></div>
+    <div class="field-row"><label>月費 NTD／月</label><input type="number" id="licMonthlyFee" value="${lic.monthlyFee}"></div>
+    <div class="field-row"><label>首年免收月數</label><input type="number" id="licFreeMonths" value="${lic.freeMonthsFirstYear}"></div>
+    <div class="field-row"><label>計費週期</label><input type="text" id="licBillingCycle" value="${escapeHtml(lic.billingCycle)}"></div>
+    <div class="field-row"><label>已繳費至（留空＝尚未開通）</label><input type="date" id="licPaidThrough" value="${paidThroughVal}"></div>
+    <button class="icon-btn" style="width:100%;" onclick="saveLicenseFields()">💾 儲存以上設定</button>
+    <button class="icon-btn" style="width:100%;margin-top:8px;" onclick="activateOrRenewLicense()">✓ 標記已收費並開通／續約一年（自動延長已繳費至日期）</button>
   `;
+}
+function saveLicenseFields(){
+  if(!isMaintainer()) return;
+  const lic = db.license;
+  const actDate = document.getElementById('licActDate').value;
+  const paidThrough = document.getElementById('licPaidThrough').value;
+  lic.activationDate = actDate ? new Date(actDate+'T00:00:00').toISOString() : lic.activationDate;
+  lic.trialDays = parseInt(document.getElementById('licTrialDays').value)||lic.trialDays;
+  lic.setupFee = parseFloat(document.getElementById('licSetupFee').value)||0;
+  lic.monthlyFee = parseFloat(document.getElementById('licMonthlyFee').value)||0;
+  lic.freeMonthsFirstYear = parseInt(document.getElementById('licFreeMonths').value)||0;
+  lic.billingCycle = document.getElementById('licBillingCycle').value.trim() || lic.billingCycle;
+  lic.paidThroughDate = paidThrough ? new Date(paidThrough+'T00:00:00').toISOString() : null;
+  lic.status = lic.paidThroughDate ? 'active' : 'trial'; // 依有沒有已繳費至日期重新判定狀態，之後computeLicenseStatus還會依日期再自動校正
+  saveDB();
+  renderLicensePanel(); renderLicenseBanner(); renderLicenseGate();
+  showToast('已儲存授權設定');
 }
 
 function applySettings(){
