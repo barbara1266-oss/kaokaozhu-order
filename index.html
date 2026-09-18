@@ -718,6 +718,9 @@ const FULL_SUPPLIER_IMPORT = [
   ]},
 ];
 
+/* 金額一律四捨五入成整數：建立/編輯單價、驗收加總都套用這個 */
+function money(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n); }
+
 const DB_KEY = 'kklz_order_system_v1';
 const GAS_URL_KEY = 'kklz_gas_url';
 const ROLES = ['維護專員','店經理','採購','後台驗收','營運(唯讀)','預備人員'];
@@ -830,7 +833,7 @@ function seedDB(){
     {id:'i7', supplierId:'s3', code:'E01017', name:'龍頭牌5斤背心袋', unit:'包', price:30},
     {id:'i8', supplierId:'s4', code:'OI299-24090037', name:'韓式專業豆腐條', unit:'塊', price:25},
     {id:'i9', supplierId:'s5', code:'M001', name:'五花肉片', unit:'斤', price:180},
-    {id:'i10', supplierId:'s6', code:'V001', name:'高山高麗菜', unit:'斤', price:36},
+    {id:'i10', supplierId:'s1', code:'V001', name:'高山高麗菜 (炸醬麵)', unit:'斤', price:35},
   ];
   return {
     suppliers, items,
@@ -1179,6 +1182,7 @@ function renderItemList(){
           <input type="number" step="any" min="0" class="qty-input" value="${qty||''}" placeholder="0"
             onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
         </div>
+        ${!isReadonly()?`<div class="del-x" style="font-size:12px;margin-top:6px;" onclick="deleteItem('${it.id}')">刪除品項</div>`:''}
       </div>`;
     }).join('');
     return;
@@ -1191,7 +1195,9 @@ function renderItemList(){
         <div class="item-code">${escapeHtml(it.code||'')}</div>
         <div class="item-name">${escapeHtml(it.name)}</div>
         <div class="item-price-row">單價 NTD <input type="number" value="${it.price}" ${isReadonly()?'disabled':''}
-          onchange="updateItemPrice('${it.id}', this.value)"> / ${escapeHtml(it.unit)}</div>
+          onchange="updateItemPrice('${it.id}', this.value)"> / ${escapeHtml(it.unit)}
+          ${!isReadonly()?`<span class="del-x" style="padding:2px 8px;font-size:12px;" onclick="deleteItem('${it.id}')">刪除</span>`:''}
+        </div>
       </div>
       <div class="item-controls">
         <span style="font-size:12px;color:var(--gray);">數量</span>
@@ -1212,7 +1218,8 @@ function setQtyDirect(sid, itemId, val){
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
 }
 function updateItemPrice(itemId, val){
-  const p = parseFloat(val); if(isNaN(p)) return;
+  const raw = parseFloat(val); if(isNaN(raw)) return;
+  const p = money(raw);
   const item = db.items.find(i=>i.id===itemId);
   if(!item || item.price===p) return;
   const old = item.price;
@@ -1224,13 +1231,23 @@ function updateItemPrice(itemId, val){
 }
 function addItem(){
   const name = document.getElementById('newItemName').value.trim();
-  const price = parseFloat(document.getElementById('newItemPrice').value)||0;
+  const price = money(parseFloat(document.getElementById('newItemPrice').value)||0);
   if(!name) return;
   db.items.push({id:'i'+Date.now(), supplierId:state.currentSupplierId, code:'', name, unit:'份', price});
   document.getElementById('newItemName').value='';
   document.getElementById('newItemPrice').value='';
   saveDB(); renderItemList();
   showToast('已新增品項');
+}
+function deleteItem(itemId){
+  if(isReadonly()) return;
+  db.items = db.items.filter(i=>i.id!==itemId);
+  for(const sid in db.cart){
+    delete db.cart[sid][itemId];
+    if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
+  }
+  saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList(); renderAdmin();
+  showToast('已刪除品項');
 }
 function quickReorder(){
   if(isReadonly()) return;
@@ -1270,7 +1287,7 @@ function cartGrandTotal(){
       if(item) total += item.price * db.cart[sid][itemId];
     }
   }
-  return total;
+  return money(total);
 }
 function updateCheckoutBar(){
   const bar = document.getElementById('checkoutBar');
@@ -1298,10 +1315,10 @@ function renderCheckout(){
       const qty = db.cart[sid][itemId];
       const lineTotal = item.price*qty;
       sub += lineTotal;
-      rows += `<div class="co-item"><span>${escapeHtml(item.name)} ×${qty}${escapeHtml(item.unit)}</span><span>NTD ${lineTotal}</span></div>`;
+      rows += `<div class="co-item"><span>${escapeHtml(item.name)} ×${qty}${escapeHtml(item.unit)}</span><span>NTD ${money(lineTotal)}</span></div>`;
     }
     html += `<div class="supplier-block"><h3>${escapeHtml(s.name)}</h3>${rows}
-      <div class="co-sub"><span>小計</span><span>NTD ${sub}</span></div></div>`;
+      <div class="co-sub"><span>小計</span><span>NTD ${money(sub)}</span></div></div>`;
   }
   wrap.innerHTML = html || '<div class="empty">購物車是空的</div>';
   document.getElementById('grandTotal').textContent = cartGrandTotal();
@@ -1489,7 +1506,7 @@ function openReceiveDetail(orderId){
           <input type="number" step="any" value="${it.price}" data-idx="${idx}" data-field="price" style="width:100%;"
             oninput="onReceiveFieldChange('${orderId}', ${idx})" ${isReadonly()?'disabled':''}></span>
       </div>
-      <div style="text-align:right;font-size:12px;color:var(--gray);">小計 NTD <span id="lineTotal-${idx}">${it.qty*it.price}</span></div>
+      <div style="text-align:right;font-size:12px;color:var(--gray);">小計 NTD <span id="lineTotal-${idx}">${money(it.qty*it.price)}</span></div>
     </div>`).join('');
   wrap.innerHTML = `<div class="card">
     <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(o.supplierName)}</div>
@@ -1498,7 +1515,7 @@ function openReceiveDetail(orderId){
     ${rows}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;
       padding-top:12px;border-top:2px solid var(--charcoal);font-size:16px;font-weight:700;">
-      <span>這筆訂單實收總額</span><span>NTD <span id="receiveGrandTotal">${o.items.reduce((s,it)=>s+it.qty*it.price,0)}</span></span>
+      <span>這筆訂單實收總額</span><span>NTD <span id="receiveGrandTotal">${money(o.items.reduce((s,it)=>s+it.qty*it.price,0))}</span></span>
     </div>
     <div style="font-size:11px;color:var(--gray);text-align:right;margin-top:2px;">請跟供應商送貨單上的金額核對</div>
     ${!isReadonly()?`<button class="all-ok-btn" onclick="allOkReceive('${orderId}')">✓ 全部到齊、金額無誤，一鍵確認</button>
@@ -1512,9 +1529,9 @@ function onReceiveFieldChange(orderId, idx){
   const priceInp = document.querySelector(`input[data-idx="${idx}"][data-field="price"]`);
   const qty = parseFloat(qtyInp.value)||0;
   const price = parseFloat(priceInp.value)||0;
-  const lineTotal = qty*price;
+  const lineTotal = money(qty*price);
   const lineTotalEl = document.getElementById('lineTotal-'+idx);
-  lineTotalEl.textContent = lineTotal.toFixed(2).replace(/\.00$/,'');
+  lineTotalEl.textContent = lineTotal;
   lineTotalEl.style.color = lineTotal<0 ? 'var(--warn)' : 'inherit';
   lineTotalEl.style.fontWeight = lineTotal<0 ? '700' : 'normal';
   const row = document.getElementById('recv-'+idx);
@@ -1526,8 +1543,9 @@ function onReceiveFieldChange(orderId, idx){
     const p = parseFloat(document.querySelector(`input[data-idx="${i}"][data-field="price"]`)?.value)||0;
     grand += q*p;
   });
+  grand = money(grand);
   const grandEl = document.getElementById('receiveGrandTotal');
-  grandEl.textContent = grand.toFixed(2).replace(/\.00$/,'');
+  grandEl.textContent = grand;
   grandEl.style.color = grand<0 ? 'var(--warn)' : 'inherit';
 }
 function allOkReceive(orderId){
@@ -1535,10 +1553,10 @@ function allOkReceive(orderId){
   o.items.forEach((it,idx)=>{
     document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`).value = it.qty;
     document.querySelector(`input[data-idx="${idx}"][data-field="price"]`).value = it.price;
-    document.getElementById('lineTotal-'+idx).textContent = it.qty*it.price;
+    document.getElementById('lineTotal-'+idx).textContent = money(it.qty*it.price);
     document.getElementById('recv-'+idx).classList.remove('diff');
   });
-  document.getElementById('receiveGrandTotal').textContent = o.items.reduce((s,it)=>s+it.qty*it.price,0);
+  document.getElementById('receiveGrandTotal').textContent = money(o.items.reduce((s,it)=>s+it.qty*it.price,0));
   showToast('已標記全部到齊、金額無誤');
 }
 function confirmReceive(orderId){
@@ -1546,12 +1564,12 @@ function confirmReceive(orderId){
   const received = [];
   o.items.forEach((it,idx)=>{
     const actualQty = parseFloat(document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`).value)||0;
-    const actualPrice = parseFloat(document.querySelector(`input[data-idx="${idx}"][data-field="price"]`).value)||0;
+    const actualPrice = money(parseFloat(document.querySelector(`input[data-idx="${idx}"][data-field="price"]`).value)||0);
     received.push({name:it.name, orderedQty:it.qty, actualQty, orderedPrice:it.price, actualPrice,
       diff: (actualQty!==it.qty || actualPrice!==it.price)});
   });
   o.received = received;
-  o.receivedTotal = received.reduce((s,r)=>s+r.actualQty*r.actualPrice,0);
+  o.receivedTotal = money(received.reduce((s,r)=>s+r.actualQty*r.actualPrice,0));
   o.status='done';
   o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
   saveDB(); renderReceive();
@@ -1688,7 +1706,7 @@ function importFullSupplierList(){
       const exists = db.items.some(x=>x.supplierId===supplier.id && x.name===it.name);
       if(exists){ skippedItems++; return; }
       db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*10000), supplierId:supplier.id,
-        code:'', name:it.name, unit:it.unit, price:it.price});
+        code:'', name:it.name, unit:it.unit, price:money(it.price)});
       addedItems++;
     });
   });
