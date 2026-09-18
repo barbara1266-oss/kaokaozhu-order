@@ -421,7 +421,7 @@ body.readonly .readonly-badge{display:inline-block;}
    ========================================================= */
 
 const FULL_SUPPLIER_IMPORT = [
-  { name:'韓濟名味品有限公司', items:[
+  { name:'韓濟名味品有限公司-酒水', items:[
     {name:'真露-青葡萄燒酒360ML', unit:'20瓶/箱', price:1980},
     {name:'優格風味燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2080},
     {name:'水蜜桃燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2050},
@@ -436,6 +436,8 @@ const FULL_SUPPLIER_IMPORT = [
     {name:'SAERO初飲初樂新燒酒(九尾狐)', unit:'20瓶/箱', price:1610},
     {name:'初飲初樂-荔枝燒酒360ML', unit:'20瓶/箱', price:2050},
     {name:'清露-蜂蜜蘋果燒酒360ML', unit:'20瓶/箱', price:1700},
+  ]},
+  { name:'韓濟名味品有限公司-食材', items:[
     {name:'芸豆罐頭', unit:'420g/罐', price:50},
     {name:'湯醬油', unit:'1.7L/瓶', price:180},
     {name:'韓國蘋果醋', unit:'1.8L/瓶', price:150},
@@ -818,7 +820,7 @@ function seedDB(){
     {id:'s1', name:'綦盛號菜商', freq:12},
     {id:'s2', name:'國豐商行有限公司', freq:9},
     {id:'s3', name:'寶強', freq:6},
-    {id:'s4', name:'韓濟名味品有限公司', freq:8},
+    {id:'s4', name:'韓濟名味品有限公司-食材', freq:8},
     {id:'s5', name:'佩森肉舖', freq:5},
     {id:'s6', name:'源鮮農業', freq:4},
     {id:'s7', name:'尚誠國際有限公司', freq:7},
@@ -1315,7 +1317,7 @@ function renderCheckout(){
       const qty = db.cart[sid][itemId];
       const lineTotal = item.price*qty;
       sub += lineTotal;
-      rows += `<div class="co-item"><span>${escapeHtml(item.name)} ×${qty}${escapeHtml(item.unit)}</span><span>NTD ${money(lineTotal)}</span></div>`;
+      rows += `<div class="co-item"><span>${escapeHtml(item.name)}　x${qty}　（${escapeHtml(item.unit)}）</span><span>NTD ${money(lineTotal)}</span></div>`;
     }
     html += `<div class="supplier-block"><h3>${escapeHtml(s.name)}</h3>${rows}
       <div class="co-sub"><span>小計</span><span>NTD ${money(sub)}</span></div></div>`;
@@ -1367,7 +1369,7 @@ function buildLineText(order){
   lines.push(`交貨日期：${order.deliveryDate}`);
   lines.push('———');
   order.items.forEach(it=>{
-    lines.push(`${it.name}　${it.qty}${it.unit}`);
+    lines.push(`${it.name}　x${it.qty}　（${it.unit}）`);
   });
   lines.push('———');
   if(order.note) lines.push(`備註：${order.note}`);
@@ -1497,7 +1499,7 @@ function openReceiveDetail(orderId){
   const wrap = document.getElementById('receiveList');
   let rows = o.items.map((it,idx)=>`
     <div class="recv-item" id="recv-${idx}" style="flex-direction:column;align-items:stretch;gap:6px;">
-      <span>${escapeHtml(it.name)}（訂 ${it.qty}${it.unit}，訂購單價 NTD ${it.price}）</span>
+      <span>${escapeHtml(it.name)}（訂 x${it.qty}　${it.unit}，訂購單價 NTD ${it.price}）</span>
       <div style="display:flex;justify-content:space-between;gap:10px;">
         <span style="flex:1;">實收數量
           <input type="number" step="any" value="${it.qty}" data-idx="${idx}" data-field="qty" style="width:100%;"
