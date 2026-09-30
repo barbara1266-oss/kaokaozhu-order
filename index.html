@@ -762,7 +762,12 @@ function getGasUrl(){
   if(stored===null) return DEFAULT_GAS_URL; // 從未設定過，用內建預設值
   return stored; // 使用者自己存過（可能是別的網址，也可能是主動清空的空字串）
 }
-function setGasUrl(url){ localStorage.setItem(GAS_URL_KEY, url.trim()); }
+function setGasUrl(url){
+  // 只有維護專員能改雲端同步網址：這個網址一旦被換掉，之後所有訂單/帳號/庫存資料
+  // 都會同步到新網址去，等於資料外洩或直接失聯，風險等同帳密外流，務必守住。
+  if(!isMaintainer()) return;
+  localStorage.setItem(GAS_URL_KEY, url.trim());
+}
 
 function loadDB(){
   try{
@@ -796,23 +801,100 @@ function setSyncStatus(mode){
   dot.className = 'sync-dot' + (m.cls?' '+m.cls:'');
   text.textContent = m.label;
 }
+let cloudPushInFlight = false; // push還沒送完（GET偷看雲端 + POST送出）的這段期間设為true，
+                                // 讓背景定期同步（見檔案最後的setInterval）知道「現在有一次push還沒完成」，
+                                // 不要在這個空檔又跑一次pull把還沒送出去的本機資料蓋掉。
+let cloudPushPending = false;  // 如果上一次push還沒送完，這段期間又有新的變更要送，先排隊，
+                                // 不要跟正在進行中的那一次同時打去雲端（避免兩個GET+POST交錯，順序亂掉）。
 function queueCloudSync(){
   const url = getGasUrl();
   if(!url) { setSyncStatus('offline'); return; }
   clearTimeout(cloudSyncTimer);
-  cloudSyncTimer = setTimeout(()=>pushToCloud(), 900); // 稍微延遲，避免連續操作觸發太多次
+  cloudSyncTimer = setTimeout(()=>{
+    cloudSyncTimer = null; // 計時器已經觸發，清掉旗標，讓背景定期同步知道「現在沒有排隊中的本機變更」
+    pushToCloud();
+  }, 900); // 稍微延遲，避免連續操作觸發太多次
 }
 function pushToCloud(){
   const url = getGasUrl();
   if(!url) return;
+  if(cloudPushInFlight){ cloudPushPending = true; return; } // 上一次還沒送完，先排隊，等它結束後自動補一次
+  cloudPushInFlight = true;
   setSyncStatus('syncing');
+  // 重大防呆：之前發生過「這台裝置打開頁面比較久，本機資料是舊的，
+  // 一儲存就把雲端上其他裝置剛新增/修改的資料整批洗掉」的事故。原因是push是
+  // 整包資料直接覆蓋雲端，沒有先看雲端現況。這裡改成push前先偷看一次
+  // 雲端目前的資料，跟本機資料做合併：
+  // - 帳號：只加不減（雲端有、本機沒有的帳號，補回本機再送出）。
+  // - 品項／供應商：用id比對＋異動時間戳記＋刪除墓碑，兩邊都有改過的話留比較新的，
+  //   任一邊刪除過的話（除非之後又被改過）維持刪除，不會復活。
+  // - 訂單／單價異動紀錄：只會新增或更新，用id比對＋異動時間戳記合併，兩邊都留著。
+  // - 系統設定：整包比較updatedAt，誰比較新就用誰的。
+  fetch(url).then(r=>r.json()).then(res=>{
+    try{
+      if(res && res.ok && res.data){
+        const remote = JSON.parse(res.data);
+        if(Array.isArray(remote.accounts)){
+          const localIds = new Set(db.accounts.map(a=>a.id));
+          const localNames = new Set(db.accounts.map(a=>(a.account||'').toLowerCase()));
+          remote.accounts.forEach(ra=>{
+            if(!localIds.has(ra.id) && !localNames.has((ra.account||'').toLowerCase())){
+              db.accounts.push(ra);
+              localIds.add(ra.id); localNames.add((ra.account||'').toLowerCase());
+            }
+          });
+        }
+        if(Array.isArray(remote.items)){
+          const r = mergeRecordsWithTombstones(db.items, remote.items, db.deletedItemIds, remote.deletedItemIds);
+          db.items = r.merged; db.deletedItemIds = r.tombstones;
+        }
+        if(Array.isArray(remote.suppliers)){
+          const r = mergeRecordsWithTombstones(db.suppliers, remote.suppliers, db.deletedSupplierIds, remote.deletedSupplierIds);
+          db.suppliers = r.merged; db.deletedSupplierIds = r.tombstones;
+        }
+        if(Array.isArray(remote.orders)){
+          db.orders = mergeAppendOnlyById(db.orders, remote.orders, 'updatedAt');
+          sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 維持新到舊排序（畫面「最近10筆」等依此排序）
+        }
+        if(Array.isArray(remote.priceLog)){
+          db.priceLog = mergeAppendOnlyById(db.priceLog, remote.priceLog, 'timeISO');
+          sortByTimeFieldDesc(db.priceLog, 'timeISO'); // 維持新到舊排序（畫面「最近30筆」依此排序）
+        }
+        if(remote.settings && typeof remote.settings==='object'){
+          if((remote.settings.updatedAt||EPOCH_ISO) > (db.settings.updatedAt||EPOCH_ISO)){
+            db.settings = remote.settings;
+            normalizeDbShape(); // 對方的settings可能是還沒升級過的舊格式，補齊欄位避免畫面顯示異常
+          }
+        }
+        // 購物車是「打到一半的訂單」，不是歷史紀錄，沒辦法逐筆比對誰改了什麼，
+        // 用整包比較cartUpdatedAt決定誰的購物車內容比較新，避免正在打單的裝置被舊裝置蓋掉。
+        if(remote.cart && typeof remote.cart==='object'){
+          if((remote.cartUpdatedAt||EPOCH_ISO) > (db.cartUpdatedAt||EPOCH_ISO)){
+            db.cart = remote.cart;
+            db.cartUpdatedAt = remote.cartUpdatedAt||EPOCH_ISO;
+          }
+        }
+      }
+    }catch(e){ /* 雲端現況讀不到或格式異常，不影響原本要送出的本機資料 */ }
+    doPushToCloud();
+  }).catch(()=>{ doPushToCloud(); }); // 讀取雲端現況失敗（例如離線）也不要卡住，照常送出本機資料
+}
+function doPushToCloud(){
+  const url = getGasUrl();
+  if(!url){ cloudPushInFlight = false; cloudPushPending = false; return; } // 極端情況：push送到一半網址被清空，也要記得解除旗標，不然背景同步會永遠卡住
   fetch(url, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'}, // 避免觸發CORS預檢，GAS不支援OPTIONS
     body: JSON.stringify(db),
   }).then(r=>r.json()).then(res=>{
     setSyncStatus(res && res.ok ? 'synced' : 'error');
-  }).catch(()=>{ setSyncStatus('error'); });
+    // 如果剛剛push前偷偷合併回了帳號/品項/供應商/訂單/設定，畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
+    if(res && res.ok && currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
+  }).catch(()=>{ setSyncStatus('error'); })
+  .finally(()=>{
+    cloudPushInFlight = false; // 不管成功失敗，這次push都結束了，背景定期同步可以恢復
+    if(cloudPushPending){ cloudPushPending = false; pushToCloud(); } // 排隊中還有新變更，馬上補送一次
+  });
 }
 function pullFromCloud(showMsg){
   const url = getGasUrl();
@@ -823,6 +905,9 @@ function pullFromCloud(showMsg){
       try{
         const remote = JSON.parse(res.data);
         db = remote;
+        normalizeDbShape(); // 雲端資料可能是還沒升級過的舊格式，缺deletedItemIds等新欄位的話下面migrate系列會直接壞掉，這裡先補齊
+        sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 雲端資料可能是舊裝置整包蓋上去、沒排序過的，這裡重新排序，避免「最近幾筆」的畫面顯示錯亂
+        sortByTimeFieldDesc(db.priceLog, 'timeISO');
         saveDBLocalOnly();
         // 雲端拉回來的資料可能是別的裝置還沒跑過修正的舊格式（例如舊版供應商
         // 名稱、舊角色名稱、意外重複的供應商），這裡每次從雲端整包蓋回本機
@@ -887,14 +972,107 @@ function seedDB(){
     },
   };
 }
-if(!db.settings) db.settings = { shopName:'燒酒烤烤豬', appSub:'叫貨系統', favicon:null, bgPattern:null };
-if(db.settings.bgPattern===undefined) db.settings.bgPattern=null;
-if(!db.license){
-  db.license = { activationDate:new Date().toISOString(), trialDays:7, status:'trial',
-    paidThroughDate:null, setupFee:8000, monthlyFee:500, freeMonthsFirstYear:6, billingCycle:'年繳' };
+// 「很久以前」的時間戳記，給補資料用：舊資料沒有updatedAt時，一律當成非常舊，
+// 這樣只要雲端或本機任一邊有真正的異動時間，就一定會贏過這個假的舊時間，不會誤判。
+const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
+function nowISO(){ return new Date().toISOString(); }
+
+// 補齊db缺少的欄位，避免舊資料/匯入的備份檔缺欄位時，畫面渲染到一半直接壞掉。
+// 開機時跑一次，還原備份檔（importBackup）之後也要再跑一次，不能只在開機時跑。
+function normalizeDbShape(){
+  if(!db.settings) db.settings = { shopName:'燒酒烤烤豬', appSub:'叫貨系統', favicon:null, bgPattern:null };
+  if(db.settings.bgPattern===undefined) db.settings.bgPattern=null;
+  if(!db.settings.updatedAt) db.settings.updatedAt = EPOCH_ISO;
+  if(!db.license){
+    db.license = { activationDate:new Date().toISOString(), trialDays:7, status:'trial',
+      paidThroughDate:null, setupFee:8000, monthlyFee:500, freeMonthsFirstYear:6, billingCycle:'年繳' };
+  }
+  if(!db.accounts || !Array.isArray(db.accounts) || db.accounts.length===0){
+    db.accounts = [{id:'u1', account:'admin', password:'0000', role:'維護專員', name:'系統管理'}];
+  }
+  if(!Array.isArray(db.suppliers)) db.suppliers = [];
+  if(!Array.isArray(db.items)) db.items = [];
+  if(!Array.isArray(db.orders)) db.orders = [];
+  if(!Array.isArray(db.priceLog)) db.priceLog = [];
+  if(!db.cart || typeof db.cart!=='object') db.cart = {};
+  if(!db.cartUpdatedAt) db.cartUpdatedAt = EPOCH_ISO;
+  if(!db.lastOrderBySupplier || typeof db.lastOrderBySupplier!=='object') db.lastOrderBySupplier = {};
+  if(!db.currentRole) db.currentRole = ROLES[0];
+  // 多裝置合併同步要用的時間戳記／墓碑清單／唯一id，舊資料沒有的話在這裡補齊
+  if(!Array.isArray(db.deletedItemIds)) db.deletedItemIds = [];
+  if(!Array.isArray(db.deletedSupplierIds)) db.deletedSupplierIds = [];
+  db.items.forEach(it=>{ if(!it.updatedAt) it.updatedAt = EPOCH_ISO; });
+  // 品項顯示順序改用sortIndex欄位排序（不再依賴陣列本身的排列順序，多裝置合併同步
+  // 才不會把手動排好的順序弄亂）。舊資料沒有sortIndex的話，照目前陣列裡的順序
+  // （也就是升級前畫面顯示的順序）依序補上，這樣升級當下畫面看起來完全不會變動。
+  {
+    const seenNext = {};
+    db.items.forEach(it=>{
+      if(it.sortIndex===undefined || it.sortIndex===null){
+        const sid = it.supplierId;
+        if(seenNext[sid]===undefined) seenNext[sid] = 1;
+        it.sortIndex = seenNext[sid]++;
+      }
+    });
+  }
+  db.suppliers.forEach(s=>{ if(!s.updatedAt) s.updatedAt = EPOCH_ISO; });
+  db.orders.forEach(o=>{ if(!o.updatedAt) o.updatedAt = o.createdAtISO || EPOCH_ISO; });
+  db.priceLog.forEach(l=>{
+    if(!l.id) l.id = 'pl'+Math.random().toString(36).slice(2)+Date.now();
+    if(!l.timeISO) l.timeISO = EPOCH_ISO;
+  });
 }
-if(!db.accounts || db.accounts.length===0){
-  db.accounts = [{id:'u1', account:'admin', password:'0000', role:'維護專員', name:'系統管理'}];
+normalizeDbShape();
+
+// ---------- 多裝置合併同步的共用邏輯 ----------
+// 品項／供應商：用id比對，兩邊都有的話留「異動時間比較新」的那筆；
+// 只有一邊有的話，要先看看是不是「另一邊其實早就刪除了、只是這台裝置比較舊還沒收到通知」，
+// 用墓碑清單（deletedXxxIds，記錄「什麼id在什麼時間被刪除」）判斷：
+// 如果刪除時間比對方那筆資料的異動時間還新，代表「先刪除、之後也沒有人在其他裝置改過它」，維持已刪除；
+// 如果對方那筆資料異動時間比刪除時間新，代表「刪除之後又有人在別的裝置改了它」，视为復活，保留下來。
+function mergeRecordsWithTombstones(localArr, remoteArr, localTombstones, remoteTombstones){
+  const remoteTomb = remoteTombstones||[], localTomb = localTombstones||[];
+  const combinedTomb = new Map();
+  localTomb.forEach(t=>{ if(t && t.id) combinedTomb.set(t.id, t.deletedAt||EPOCH_ISO); });
+  remoteTomb.forEach(t=>{
+    if(!t || !t.id) return;
+    const cur = combinedTomb.get(t.id);
+    if(!cur || (t.deletedAt||EPOCH_ISO) > cur) combinedTomb.set(t.id, t.deletedAt||EPOCH_ISO);
+  });
+  const localMap = new Map((localArr||[]).map(r=>[r.id, r]));
+  const remoteMap = new Map((remoteArr||[]).map(r=>[r.id, r]));
+  const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const merged = [];
+  allIds.forEach(id=>{
+    const lr = localMap.get(id), rr = remoteMap.get(id);
+    let winner;
+    if(lr && rr) winner = ((lr.updatedAt||EPOCH_ISO) >= (rr.updatedAt||EPOCH_ISO)) ? lr : rr;
+    else winner = lr || rr;
+    const deletedAt = combinedTomb.get(id);
+    if(deletedAt && winner && deletedAt > (winner.updatedAt||EPOCH_ISO)) return; // 刪除比任何一邊的異動都新，維持刪除
+    if(winner) merged.push(winner);
+  });
+  return { merged, tombstones: Array.from(combinedTomb, ([id,deletedAt])=>({id,deletedAt})) };
+}
+// 訂單／異動紀錄：只會新增或更新，不會被刪除，所以不用墓碑，單純用id比對取異動時間較新的那筆，
+// 並把只存在單一邊的記錄也留下來（避免漏掉另一台裝置新產生的訂單/紀錄）。
+function mergeAppendOnlyById(localArr, remoteArr, timeField){
+  const localMap = new Map((localArr||[]).map(r=>[r.id, r]));
+  const remoteMap = new Map((remoteArr||[]).map(r=>[r.id, r]));
+  const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const merged = [];
+  allIds.forEach(id=>{
+    const lr = localMap.get(id), rr = remoteMap.get(id);
+    if(lr && rr) merged.push(((lr[timeField]||EPOCH_ISO) >= (rr[timeField]||EPOCH_ISO)) ? lr : rr);
+    else merged.push(lr || rr);
+  });
+  return merged;
+}
+// 訂單／異動紀錄畫面都假設陣列是「新到舊」排序（例如只顯示最近10/30筆），
+// 合併/整包從雲端蓋回來之後都要重新排序一次，用純字串比較（ISO時間格式本身就是
+// 由大到小排就是由新到舊，不用localeCompare，避免不同瀏覽器/語系比較結果不一致）。
+function sortByTimeFieldDesc(arr, timeField){
+  arr.sort((a,b)=> (b[timeField]||EPOCH_ISO) > (a[timeField]||EPOCH_ISO) ? 1 : ((b[timeField]||EPOCH_ISO) < (a[timeField]||EPOCH_ISO) ? -1 : 0));
 }
 
 /* ---------- 系統設定（店名／Icon）---------- */
@@ -924,8 +1102,12 @@ function daysUntilRenewal(){
   return daysBetween(new Date(), new Date(db.license.paidThroughDate));
 }
 function renderLicenseBanner(){
+  const beforeStatus = db.license.status;
   const status = computeLicenseStatus();
-  saveDB();
+  // 只有「授權狀態真的改變了」（例如試用期到期變成expired）才需要存檔同步，
+  // 避免每次畫面渲染（幾乎每個操作都會觸發）都跟著整包推一次雲端，
+  // 減少不必要的同步、也降低跟其他裝置互相覆蓋資料的機會。
+  if(status !== beforeStatus) saveDB();
   const bannerId = 'licenseBanner';
   let el = document.getElementById(bannerId);
   if(!el){
@@ -1048,6 +1230,7 @@ function onBgUpload(evt){
   const reader = new FileReader();
   reader.onload = ()=>{
     db.settings.bgPattern = reader.result;
+    db.settings.updatedAt = nowISO();
     const prev = document.getElementById('bgPreview');
     prev.src = reader.result; prev.style.display='inline-block';
     saveDB(); applySettings();
@@ -1058,6 +1241,7 @@ function onBgUpload(evt){
 function resetBg(){
   if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
   db.settings.bgPattern = null;
+  db.settings.updatedAt = nowISO();
   document.getElementById('bgPreview').style.display='none';
   saveDB(); applySettings();
   showToast('已還原預設背景');
@@ -1080,6 +1264,7 @@ function onFaviconUpload(evt){
   const reader = new FileReader();
   reader.onload = ()=>{
     db.settings.favicon = reader.result;
+    db.settings.updatedAt = nowISO();
     const prev = document.getElementById('faviconPreview');
     prev.src = reader.result; prev.style.display='inline-block';
     saveDB(); applySettings();
@@ -1091,6 +1276,7 @@ function saveSettings(){
   if(!isStoreAdmin()){ showToast('只有「管理者」以上身份能修改設定'); return; }
   db.settings.shopName = document.getElementById('settingShopName').value.trim() || db.settings.shopName;
   db.settings.appSub = document.getElementById('settingAppSub').value.trim() || db.settings.appSub;
+  db.settings.updatedAt = nowISO();
   saveDB();
   applySettings();
   showToast('系統設定已儲存');
@@ -1222,7 +1408,7 @@ function addSupplier(){
   const name = input.value.trim();
   if(!name) return;
   if(db.suppliers.some(s=>s.name===name)){ showToast('已經有一家同名的供應商了'); return; }
-  db.suppliers.push({id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0});
+  db.suppliers.push({id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0, updatedAt:nowISO()});
   input.value='';
   saveDB(); renderSupplierList(); renderAdmin();
   showToast('已新增供應商');
@@ -1234,7 +1420,7 @@ function renderItemList(){
   const wrap = document.getElementById('itemList');
   const addRow = document.getElementById('addItemRow');
   if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
-  const items = db.items.filter(i=>i.supplierId===sid);
+  const items = sortedItemsForSupplier(sid);
   const cart = db.cart[sid] || {};
   if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項，先在下方新增</div>'; return; }
   wrap.className = state.itemViewMode==='grid' ? 'item-grid-wrap' : '';
@@ -1284,6 +1470,7 @@ function setQtyDirect(sid, itemId, val){
   if(!qty || qty<=0){ delete db.cart[sid][itemId]; }
   else { db.cart[sid][itemId] = qty; }
   if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
+  db.cartUpdatedAt = nowISO();
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
 }
 function updateItemPrice(itemId, val){
@@ -1294,8 +1481,9 @@ function updateItemPrice(itemId, val){
   if(!item || item.price===p) return;
   const old = item.price;
   item.price = p;
-  db.priceLog.unshift({itemId:item.id, itemName:item.name, old, next:p, role: currentAccount?currentAccount.role:'',
-    time:new Date().toLocaleString('zh-TW',{hour12:false})});
+  item.updatedAt = nowISO();
+  db.priceLog.unshift({id:'pl'+Math.random().toString(36).slice(2)+Date.now(), itemId:item.id, itemName:item.name, old, next:p, role: currentAccount?currentAccount.role:'',
+    time:new Date().toLocaleString('zh-TW',{hour12:false}), timeISO:nowISO()});
   saveDB(); renderStock(); renderAdmin();
   showToast('單價已更新並記錄');
 }
@@ -1306,23 +1494,44 @@ function updateItemUnit(itemId, val){
   const v = val.trim();
   if(!v || item.unit===v) return;
   item.unit = v;
+  item.updatedAt = nowISO();
   saveDB(); renderItemList(); renderStock(); renderItemManage();
   showToast('單位已更新');
+}
+// 品項的顯示順序不再依賴db.items陣列本身的排列順序（多裝置合併同步時，陣列順序
+// 沒辦法保證跟妳手動排的一樣），改成每個品項自己帶一個sortIndex數字欄位，
+// 顯示的時候依sortIndex排序。這樣就算合併同步把陣列重新組合過，排序也不會亂，
+// 而且sortIndex本身也有updatedAt保護，兩台裝置搶著調順序的話一樣是留比較新的那次。
+function sortedItemsForSupplier(sid){
+  // sortIndex相同時（極端情況：兩台裝置離線各自新增品項，合併時剛好算出同一個值），
+  // 用id當第二個排序依據，確保「不管在哪一台裝置上看，順序都一樣」，不會兩邊看到的順序不同。
+  return db.items.filter(i=>i.supplierId===sid).sort((a,b)=>(a.sortIndex||0)-(b.sortIndex||0) || String(a.id).localeCompare(String(b.id)));
+}
+function nextSortIndex(sid){
+  const existing = db.items.filter(i=>i.supplierId===sid).map(i=>i.sortIndex||0);
+  return existing.length ? Math.max(...existing)+1 : 1;
 }
 function moveItem(itemId, dir){
   if(!isStoreAdmin()) return;
   const item = db.items.find(i=>i.id===itemId);
   if(!item) return;
-  const sameSupplier = db.items.filter(i=>i.supplierId===item.supplierId);
+  let sameSupplier = sortedItemsForSupplier(item.supplierId);
   const idx = sameSupplier.findIndex(i=>i.id===itemId);
   const swapIdx = idx + dir;
   if(swapIdx<0 || swapIdx>=sameSupplier.length) return;
-  const other = sameSupplier[swapIdx];
-  const realIdxA = db.items.findIndex(i=>i.id===item.id);
-  const realIdxB = db.items.findIndex(i=>i.id===other.id);
-  const tmp = db.items[realIdxA];
-  db.items[realIdxA] = db.items[realIdxB];
-  db.items[realIdxB] = tmp;
+  let other = sameSupplier[swapIdx];
+  if(item.sortIndex===other.sortIndex){
+    // 兩筆品項的sortIndex剛好一樣（例如兩台裝置離線時各自替同一家供應商新增品項，
+    // 合併同步時湊巧算出同一個排序值），直接交換等於沒交換，上下鍵會像按了沒反應。
+    // 這裡先把這家供應商底下的品項依目前排序重新編號成1,2,3...打破並列，再繼續交換。
+    sameSupplier.forEach((it,i)=>{ it.sortIndex = i+1; });
+    other = sameSupplier[swapIdx];
+  }
+  const tmp = item.sortIndex;
+  item.sortIndex = other.sortIndex;
+  other.sortIndex = tmp;
+  item.updatedAt = nowISO();
+  other.updatedAt = nowISO();
   saveDB(); renderItemList(); renderItemManage();
 }
 function addItem(){
@@ -1330,7 +1539,7 @@ function addItem(){
   const name = document.getElementById('newItemName').value.trim();
   const price = money(parseFloat(document.getElementById('newItemPrice').value)||0);
   if(!name) return;
-  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:state.currentSupplierId, code:'', name, unit:'份', price});
+  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:state.currentSupplierId, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(state.currentSupplierId)});
   document.getElementById('newItemName').value='';
   document.getElementById('newItemPrice').value='';
   saveDB(); renderItemList();
@@ -1343,7 +1552,7 @@ function addItemFromManage(){
   const name = document.getElementById('itemManageNewName').value.trim();
   const price = money(parseFloat(document.getElementById('itemManageNewPrice').value)||0);
   if(!name) return;
-  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:sid, code:'', name, unit:'份', price});
+  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:sid, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(sid)});
   document.getElementById('itemManageNewName').value='';
   document.getElementById('itemManageNewPrice').value='';
   saveDB(); renderItemManage(); renderItemList();
@@ -1352,10 +1561,12 @@ function addItemFromManage(){
 function deleteItem(itemId){
   if(!isStoreAdmin()) return;
   db.items = db.items.filter(i=>i.id!==itemId);
+  db.deletedItemIds.push({id:itemId, deletedAt:nowISO()}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   for(const sid in db.cart){
     delete db.cart[sid][itemId];
     if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
   }
+  db.cartUpdatedAt = nowISO();
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList(); renderAdmin();
   showToast('已刪除品項');
 }
@@ -1372,6 +1583,7 @@ function quickReorder(){
   });
   if(Object.keys(filtered).length===0){ showToast('上次訂購的品項都已經被刪除了，請重新挑選品項'); return; }
   db.cart[sid] = filtered;
+  db.cartUpdatedAt = nowISO();
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
   showToast(droppedCount>0 ? `已複製上次訂單內容（${droppedCount}項已刪除的品項自動略過）` : '已複製上次訂單內容，可微調數量');
 }
@@ -1462,19 +1674,22 @@ function confirmCheckout(){
       return {code:item.code, name:item.name, unit:item.unit, price:item.price, qty:db.cart[sid][itemId]};
     }).filter(Boolean);
     if(items.length===0) continue; // 這家供應商購物車裡的品項全部都已經被刪除了，不產生空訂單
+    const createdAtISO = nowISO();
     const order = {
       id:'PO'+Date.now()+Math.floor(Math.random()*100),
       supplierId:sid, supplierName:s.name, items, deliveryDate:date, note,
       status:'sent', createdAt:new Date().toLocaleString('zh-TW',{hour12:false}),
-      createdAtISO:new Date().toISOString(),
+      createdAtISO, updatedAt:createdAtISO,
       received:null,
     };
     db.orders.unshift(order);
     db.lastOrderBySupplier[sid] = {...db.cart[sid]};
     s.freq = (s.freq||0)+1;
+    s.updatedAt = nowISO();
     newOrders.push(order);
   }
   db.cart = {};
+  db.cartUpdatedAt = nowISO();
   saveDB();
   openShareModal(newOrders);
   document.getElementById('orderNote').value='';
@@ -1672,6 +1887,7 @@ function onReceiveFieldChange(orderId, idx){
   grandEl.style.color = grand<0 ? 'var(--warn)' : 'inherit';
 }
 function allOkReceive(orderId){
+  if(isReadonly()) return; // 唯讀身份不可變更收貨資料（畫面按鈕已隱藏，這裡再擋一次避免被繞過）
   const o = db.orders.find(x=>x.id===orderId);
   o.items.forEach((it,idx)=>{
     document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`).value = it.qty;
@@ -1683,6 +1899,7 @@ function allOkReceive(orderId){
   showToast('已標記全部到齊、金額無誤');
 }
 function confirmReceive(orderId){
+  if(isReadonly()) return; // 唯讀身份不可確認收貨（畫面按鈕已隱藏，這裡再擋一次避免被繞過）
   const o = db.orders.find(x=>x.id===orderId);
   const received = [];
   o.items.forEach((it,idx)=>{
@@ -1695,6 +1912,7 @@ function confirmReceive(orderId){
   o.receivedTotal = money(received.reduce((s,r)=>s+r.actualQty*r.actualPrice,0));
   o.status='done';
   o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
+  o.updatedAt = nowISO();
   saveDB(); renderReceive();
   showToast('已完成收貨確認');
 }
@@ -1706,7 +1924,8 @@ function renderStock(){
   filterWrap.innerHTML = `<button class="${stockFilterSupplier==='all'?'on':''}" onclick="setStockFilter('all')">全部</button>` +
     db.suppliers.map(s=>`<button class="${stockFilterSupplier===s.id?'on':''}" onclick="setStockFilter('${s.id}')">${escapeHtml(s.name)}</button>`).join('');
   const wrap = document.getElementById('stockList');
-  const items = db.items.filter(i=> stockFilterSupplier==='all' || i.supplierId===stockFilterSupplier);
+  const items = db.items.filter(i=> stockFilterSupplier==='all' || i.supplierId===stockFilterSupplier)
+    .sort((a,b)=> a.supplierId===b.supplierId ? (a.sortIndex||0)-(b.sortIndex||0) : String(a.supplierId||'').localeCompare(String(b.supplierId||'')));
   if(items.length===0){ wrap.innerHTML='<div class="empty">沒有品項</div>'; return; }
   wrap.innerHTML = items.map(it=>{
     const s = db.suppliers.find(x=>x.id===it.supplierId);
@@ -1740,8 +1959,10 @@ function toggleItemHistory(itemId){
 }
 function setStockFilter(id){ stockFilterSupplier=id; renderStock(); }
 function updateStockQty(itemId, val){
+  if(isReadonly()) return; // 唯讀身份不可修改盤點數量（欄位已disabled，這裡再擋一次避免被繞過）
   const item = db.items.find(i=>i.id===itemId);
   item.stockQty = parseFloat(val)||0;
+  item.updatedAt = nowISO();
   saveDB();
 }
 
@@ -1773,6 +1994,7 @@ function renderCloudSyncCard(){
     </div>`;
 }
 function onSaveGasUrl(){
+  if(!isMaintainer()){ showToast('僅「維護專員」可以修改雲端同步網址'); return; }
   const val = document.getElementById('gasUrlInput').value.trim();
   setGasUrl(val);
   showToast(val ? '已儲存雲端網址' : '已清空雲端網址（改回純本機模式）');
@@ -1835,11 +2057,22 @@ function importBackup(evt){
       showToast('這個檔案格式不對，看起來不是本系統的備份檔');
       evt.target.value=''; return;
     }
+    if(parsed.accounts.length===0 || !parsed.accounts.some(a=>a && a.account && a.password)){
+      // 帳號清單是空的或裡面沒有一組帳密正常的帳號，還原下去會直接把所有人鎖在登入畫面外，且沒有救援手段
+      showToast('這份備份檔沒有任何有效帳號，為避免所有人被鎖在登入畫面外，已取消還原');
+      evt.target.value=''; return;
+    }
     const ok = confirm(
       `確定要用這份備份檔還原嗎？\n\n備份內容：${parsed.suppliers.length}家供應商・${parsed.items.length}個品項・${(parsed.orders||[]).length}筆訂單・${parsed.accounts.length}組帳號\n\n這個動作會覆蓋目前所有資料（包含雲端），且無法復原。建議先按上面「匯出備份檔」保留目前的資料再繼續。`
     );
     if(!ok){ evt.target.value=''; return; }
     db = parsed;
+    normalizeDbShape(); // 備份檔可能缺少settings/license/priceLog等欄位，先補齊，避免還原後畫面渲染一半壞掉
+    // 備份檔可能是舊格式（例如還沒拆分供應商、角色名稱是舊的），跟pullFromCloud()一樣，
+    // 還原後要重跑一次資料轉換，不然畫面會殘留舊格式資料，要等下次整頁重新整理才會修正。
+    migrateHanjiSplit();
+    migrateRoles();
+    mergeDuplicateSuppliers();
     saveDBLocalOnly();
     applySettings();
     renderAll();
@@ -1901,7 +2134,7 @@ function renderItemManage(){
   if(curVal && db.suppliers.some(s=>s.id===curVal)) sel.value = curVal;
   const sid = sel.value;
   if(!sid){ wrap.innerHTML=''; return; }
-  const items = db.items.filter(i=>i.supplierId===sid);
+  const items = sortedItemsForSupplier(sid);
   if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項</div>'; return; }
   wrap.innerHTML = `<div class="card">` + items.map((it,idx)=>`
     <div class="supplier-manage-item" style="flex-wrap:wrap;gap:8px;">
@@ -1925,9 +2158,14 @@ function renderItemManage(){
 }
 function deleteSupplier(id){
   if(!isStoreAdmin()) return;
+  const deletedAt = nowISO();
   db.suppliers = db.suppliers.filter(s=>s.id!==id);
+  db.deletedSupplierIds.push({id, deletedAt}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
+  const removedItemIds = db.items.filter(i=>i.supplierId===id).map(i=>i.id);
   db.items = db.items.filter(i=>i.supplierId!==id);
+  removedItemIds.forEach(itemId=>{ db.deletedItemIds.push({id:itemId, deletedAt}); }); // 供應商底下的品項也一併記錄刪除，不然合併時會被復活
   delete db.cart[id];
+  db.cartUpdatedAt = nowISO();
   saveDB(); renderAdmin(); renderSupplierList();
   showToast('已刪除供應商');
 }
@@ -1939,15 +2177,16 @@ function importFullSupplierList(){
   FULL_SUPPLIER_IMPORT.forEach(group=>{
     let supplier = db.suppliers.find(s=>s.name===group.name);
     if(!supplier){
-      supplier = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name:group.name, freq:0};
+      supplier = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name:group.name, freq:0, updatedAt:nowISO()};
       db.suppliers.push(supplier);
       addedSuppliers++;
     }
+    let nextIdx = nextSortIndex(supplier.id);
     group.items.forEach(it=>{
       const exists = db.items.some(x=>x.supplierId===supplier.id && x.name===it.name);
       if(exists){ skippedItems++; return; }
       db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*10000), supplierId:supplier.id,
-        code:'', name:it.name, unit:it.unit, price:money(it.price)});
+        code:'', name:it.name, unit:it.unit, price:money(it.price), updatedAt:nowISO(), sortIndex:nextIdx++});
       addedItems++;
     });
   });
@@ -2038,18 +2277,23 @@ function migrateHanjiSplit(){
   const liquorNames = new Set((liquorGroup?liquorGroup.items:[]).map(i=>i.name));
   function ensureSupplier(name){
     let s = db.suppliers.find(x=>x.name===name);
-    if(!s){ s = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0}; db.suppliers.push(s); }
+    if(!s){ s = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0, updatedAt:nowISO()}; db.suppliers.push(s); }
     return s;
   }
   const liquorSup = ensureSupplier('韓濟名味品有限公司-酒水');
   const foodSup = ensureSupplier('韓濟名味品有限公司-食材');
+  let nextLiquorIdx = nextSortIndex(liquorSup.id), nextFoodIdx = nextSortIndex(foodSup.id);
   db.items.forEach(it=>{
     if(it.supplierId===old.id){
-      it.supplierId = liquorNames.has(it.name) ? liquorSup.id : foodSup.id;
+      const toLiquor = liquorNames.has(it.name);
+      it.supplierId = toLiquor ? liquorSup.id : foodSup.id;
+      it.sortIndex = toLiquor ? nextLiquorIdx++ : nextFoodIdx++;
+      it.updatedAt = nowISO();
     }
   });
   liquorSup.freq = (liquorSup.freq||0) + Math.round((old.freq||0)/2);
   foodSup.freq = (foodSup.freq||0) + Math.round((old.freq||0)/2);
+  liquorSup.updatedAt = nowISO(); foodSup.updatedAt = nowISO();
   if(db.cart[old.id]){
     Object.keys(db.cart[old.id]).forEach(itemId=>{
       const it = db.items.find(x=>x.id===itemId);
@@ -2058,8 +2302,10 @@ function migrateHanjiSplit(){
       db.cart[it.supplierId][itemId] = db.cart[old.id][itemId];
     });
     delete db.cart[old.id];
+    db.cartUpdatedAt = nowISO();
   }
   db.suppliers = db.suppliers.filter(s=>s.id!==old.id);
+  db.deletedSupplierIds.push({id:old.id, deletedAt:nowISO()});
   saveDB();
 }
 
@@ -2084,20 +2330,23 @@ function mergeDuplicateSuppliers(){
   db.suppliers.forEach(s=>{
     const keep = byName[s.name];
     if(keep){
-      db.items.forEach(it=>{ if(it.supplierId===s.id) it.supplierId = keep.id; });
+      db.items.forEach(it=>{ if(it.supplierId===s.id){ it.supplierId = keep.id; it.updatedAt = nowISO(); } });
       if(db.cart[s.id]){
         db.cart[keep.id] = db.cart[keep.id] || {};
         Object.keys(db.cart[s.id]).forEach(itemId=>{
           db.cart[keep.id][itemId] = (db.cart[keep.id][itemId]||0) + db.cart[s.id][itemId];
         });
         delete db.cart[s.id];
+        db.cartUpdatedAt = nowISO();
       }
       if(db.lastOrderBySupplier && db.lastOrderBySupplier[s.id]){
         if(!db.lastOrderBySupplier[keep.id]) db.lastOrderBySupplier[keep.id] = db.lastOrderBySupplier[s.id];
         delete db.lastOrderBySupplier[s.id];
       }
       keep.freq = (keep.freq||0) + (s.freq||0);
+      keep.updatedAt = nowISO();
       s._dupMarked = true;
+      db.deletedSupplierIds.push({id:s.id, deletedAt:nowISO()}); // 同名合併掉的供應商也要記墓碑，不然被舊裝置合併同步時會復活
       changed = true;
     } else {
       byName[s.name] = s;
@@ -2142,6 +2391,17 @@ async function initApp(){
   renderLicenseGate();
 }
 initApp();
+
+/* ---------- 背景定期同步（縮短資料落後的時間窗，降低舊裝置蓋掉新資料的風險） ---------- */
+setInterval(()=>{
+  if(!currentAccount) return;           // 還沒登入，不需要背景同步
+  if(cloudSyncTimer) return;            // 本機正有變更排隊要送出，避免搶跑
+  if(cloudPushInFlight) return;         // 本機有一次push還在送出中（尚未完成），避免這時候pull把還沒送出的資料蓋掉
+  if(!getGasUrl()) return;              // 沒設定雲端網址就不用同步
+  const ae = document.activeElement;
+  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')) return; // 使用者正在輸入，先不要打斷
+  pullFromCloud(false);
+}, 3*60*1000);
 </script>
 </body>
 </html>
