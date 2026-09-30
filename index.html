@@ -258,7 +258,7 @@ body.readonly .readonly-badge{display:inline-block;}
 <section class="page active" id="page-order">
   <div class="page-title">選擇供應商 <span class="cnt" id="supplierCount"></span></div>
   <div id="supplierList"></div>
-  <div class="add-supplier-row">
+  <div class="add-supplier-row" id="addSupplierRow">
     <input type="text" id="newSupplierName" placeholder="新增供應商名稱…">
     <button class="icon-btn" onclick="addSupplier()">＋新增</button>
   </div>
@@ -275,7 +275,7 @@ body.readonly .readonly-badge{display:inline-block;}
   </div>
   <div class="page-title" id="itemsSupplierTitle"></div>
   <div id="itemList"></div>
-  <div class="add-supplier-row">
+  <div class="add-supplier-row" id="addItemRow">
     <input type="text" id="newItemName" placeholder="新增品項名稱…">
     <input type="text" id="newItemPrice" placeholder="單價" style="max-width:70px;">
     <button class="icon-btn" onclick="addItem()">＋新增</button>
@@ -383,6 +383,15 @@ body.readonly .readonly-badge{display:inline-block;}
     <button class="icon-btn" style="width:100%;" onclick="importFullSupplierList()">📥 一鍵匯入完整供應商名單</button>
   </div>
   <div class="card" id="adminSupplierList"></div>
+
+  <div class="page-title" style="margin-top:18px;">品項管理 <span class="cnt">可修改單位、排序、刪除</span></div>
+  <div class="card">
+    <div class="field-row" style="margin-bottom:0;">
+      <label>選擇供應商</label>
+      <select id="itemManageSupplierSelect" onchange="renderItemManage()"></select>
+    </div>
+  </div>
+  <div id="itemManageList"></div>
 
   <div class="page-title" style="margin-top:18px;">單價異動紀錄</div>
   <div class="card" id="priceLog"></div>
@@ -725,8 +734,15 @@ function money(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n); }
 
 const DB_KEY = 'kklz_order_system_v1';
 const GAS_URL_KEY = 'kklz_gas_url';
-const ROLES = ['維護專員','店經理','採購','後台驗收','營運(唯讀)','預備人員'];
-function isMaintainer(){ return db.currentRole === '維護專員'; }
+const ROLES = ['維護專員','管理者','叫貨者','營運(唯讀)'];
+const LEGACY_ROLE_MAP = {'店經理':'叫貨者','採購':'叫貨者','後台驗收':'叫貨者','預備人員':'叫貨者'}; // 舊角色名稱自動對應到新角色
+/* 權限分三層：
+   isMaintainer＝系統維護方（晨諾創意，Barbara專用），帳號管理／雲端同步／授權收費／背景圖案／一鍵匯入 只有這層能動
+   isStoreAdmin＝店家管理者（Eva），可以管供應商／品項／店名等「店家營運」內容，但動不到上面那層
+   isReadonly＝唯讀，什麼都不能改
+   叫貨者＝只能下單／驗收／盤點 */
+function isMaintainer(){ return !!currentAccount && currentAccount.role === '維護專員'; }
+function isStoreAdmin(){ return !!currentAccount && (currentAccount.role === '維護專員' || currentAccount.role === '管理者'); }
 
 let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
@@ -1032,6 +1048,7 @@ function fillSettingsForm(){
   if(db.settings.favicon){ prev.src = db.settings.favicon; prev.style.display='inline-block'; }
 }
 function onFaviconUpload(evt){
+  if(!isStoreAdmin()) return;
   const file = evt.target.files[0];
   if(!file) return;
   const reader = new FileReader();
@@ -1043,7 +1060,7 @@ function onFaviconUpload(evt){
   reader.readAsDataURL(file);
 }
 function saveSettings(){
-  if(isReadonly()){ showToast('唯讀模式無法修改設定'); return; }
+  if(!isStoreAdmin()){ showToast('只有「管理者」以上身份能修改設定'); return; }
   db.settings.shopName = document.getElementById('settingShopName').value.trim() || db.settings.shopName;
   db.settings.appSub = document.getElementById('settingAppSub').value.trim() || db.settings.appSub;
   saveDB();
@@ -1086,9 +1103,7 @@ function doLogin(){
   loginAsAccount(acc, true);
 }
 function loginAsAccount(acc, persistSession){
-  currentAccount = acc;
-  db.currentRole = acc.role;
-  saveDB();
+  currentAccount = acc; // 身份只存在這支裝置的記憶體/session裡，故意不寫回db，避免跟其他裝置互相覆蓋
   if(persistSession){
     const expiresAt = new Date(Date.now() + SESSION_DAYS*86400000).toISOString();
     localStorage.setItem(SESSION_KEY, JSON.stringify({accountId:acc.id, expiresAt}));
@@ -1108,10 +1123,12 @@ function doLogout(){
   document.getElementById('loginGate').classList.add('show');
 }
 function applyRole(){
-  const readonly = db.currentRole === '營運(唯讀)';
-  document.body.classList.toggle('readonly', readonly);
+  document.body.classList.toggle('readonly', isReadonly());
 }
-function isReadonly(){ return db.currentRole === '營運(唯讀)'; }
+/* 注意：身份一律只認「這支裝置自己登入的帳號」(currentAccount)，
+   不可以看會同步雲端、大家共用的db.currentRole——否則管理者跟叫貨者兩支手機同時在線，
+   身份判斷會互相蓋過去，是很危險的bug，所以這裡刻意不用db.currentRole。 */
+function isReadonly(){ return !!currentAccount && currentAccount.role === '營運(唯讀)'; }
 
 /* ---------- Tab / 頁面切換 ---------- */
 function switchTab(tab){
@@ -1135,6 +1152,8 @@ function goPage(id){
 function renderSupplierList(){
   const wrap = document.getElementById('supplierList');
   document.getElementById('supplierCount').textContent = `共 ${db.suppliers.length} 家`;
+  const addRow = document.getElementById('addSupplierRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
   const sorted = [...db.suppliers].sort((a,b)=> (b.freq||0)-(a.freq||0));
   if(sorted.length===0){ wrap.innerHTML = '<div class="empty">尚未新增任何供應商</div>'; return; }
   wrap.innerHTML = sorted.map((s,idx)=>{
@@ -1155,6 +1174,7 @@ function openSupplier(id){
   renderItemList();
 }
 function addSupplier(){
+  if(!isStoreAdmin()) return;
   const input = document.getElementById('newSupplierName');
   const name = input.value.trim();
   if(!name) return;
@@ -1168,6 +1188,8 @@ function addSupplier(){
 function renderItemList(){
   const sid = state.currentSupplierId;
   const wrap = document.getElementById('itemList');
+  const addRow = document.getElementById('addItemRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
   const items = db.items.filter(i=>i.supplierId===sid);
   const cart = db.cart[sid] || {};
   if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項，先在下方新增</div>'; return; }
@@ -1184,7 +1206,7 @@ function renderItemList(){
           <input type="number" step="any" min="0" class="qty-input" value="${qty||''}" placeholder="0"
             onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
         </div>
-        ${!isReadonly()?`<div class="del-x" style="font-size:12px;margin-top:6px;" onclick="deleteItem('${it.id}')">刪除品項</div>`:''}
+        ${isStoreAdmin()?`<div class="del-x" style="font-size:12px;margin-top:6px;" onclick="deleteItem('${it.id}')">刪除品項</div>`:''}
       </div>`;
     }).join('');
     return;
@@ -1196,9 +1218,10 @@ function renderItemList(){
       <div class="item-info">
         <div class="item-code">${escapeHtml(it.code||'')}</div>
         <div class="item-name">${escapeHtml(it.name)}</div>
-        <div class="item-price-row">單價 NTD <input type="number" value="${it.price}" ${isReadonly()?'disabled':''}
-          onchange="updateItemPrice('${it.id}', this.value)"> / ${escapeHtml(it.unit)}
-          ${!isReadonly()?`<span class="del-x" style="padding:2px 8px;font-size:12px;" onclick="deleteItem('${it.id}')">刪除</span>`:''}
+        <div class="item-price-row">單價 NTD <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'}
+          onchange="updateItemPrice('${it.id}', this.value)"> / <input type="text" value="${escapeHtml(it.unit)}" ${isStoreAdmin()?'':'disabled'}
+          style="width:70px;text-align:left;" onchange="updateItemUnit('${it.id}', this.value)">
+          ${isStoreAdmin()?`<span class="del-x" style="padding:2px 8px;font-size:12px;" onclick="deleteItem('${it.id}')">刪除</span>`:''}
         </div>
       </div>
       <div class="item-controls">
@@ -1220,18 +1243,46 @@ function setQtyDirect(sid, itemId, val){
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
 }
 function updateItemPrice(itemId, val){
+  if(!isStoreAdmin()) return;
   const raw = parseFloat(val); if(isNaN(raw)) return;
   const p = money(raw);
   const item = db.items.find(i=>i.id===itemId);
   if(!item || item.price===p) return;
   const old = item.price;
   item.price = p;
-  db.priceLog.unshift({itemId:item.id, itemName:item.name, old, next:p, role:db.currentRole,
+  db.priceLog.unshift({itemId:item.id, itemName:item.name, old, next:p, role: currentAccount?currentAccount.role:'',
     time:new Date().toLocaleString('zh-TW',{hour12:false})});
   saveDB(); renderStock(); renderAdmin();
   showToast('單價已更新並記錄');
 }
+function updateItemUnit(itemId, val){
+  if(!isStoreAdmin()) return;
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const v = val.trim();
+  if(!v || item.unit===v) return;
+  item.unit = v;
+  saveDB(); renderItemList(); renderStock(); renderItemManage();
+  showToast('單位已更新');
+}
+function moveItem(itemId, dir){
+  if(!isStoreAdmin()) return;
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const sameSupplier = db.items.filter(i=>i.supplierId===item.supplierId);
+  const idx = sameSupplier.findIndex(i=>i.id===itemId);
+  const swapIdx = idx + dir;
+  if(swapIdx<0 || swapIdx>=sameSupplier.length) return;
+  const other = sameSupplier[swapIdx];
+  const realIdxA = db.items.findIndex(i=>i.id===item.id);
+  const realIdxB = db.items.findIndex(i=>i.id===other.id);
+  const tmp = db.items[realIdxA];
+  db.items[realIdxA] = db.items[realIdxB];
+  db.items[realIdxB] = tmp;
+  saveDB(); renderItemList(); renderItemManage();
+}
 function addItem(){
+  if(!isStoreAdmin()) return;
   const name = document.getElementById('newItemName').value.trim();
   const price = money(parseFloat(document.getElementById('newItemPrice').value)||0);
   if(!name) return;
@@ -1242,7 +1293,7 @@ function addItem(){
   showToast('已新增品項');
 }
 function deleteItem(itemId){
-  if(isReadonly()) return;
+  if(!isStoreAdmin()) return;
   db.items = db.items.filter(i=>i.id!==itemId);
   for(const sid in db.cart){
     delete db.cart[sid][itemId];
@@ -1256,9 +1307,16 @@ function quickReorder(){
   const sid = state.currentSupplierId;
   const last = db.lastOrderBySupplier[sid];
   if(!last){ showToast('這家供應商還沒有歷史訂單可複製'); return; }
-  db.cart[sid] = {...last};
+  const filtered = {};
+  let droppedCount = 0;
+  Object.keys(last).forEach(itemId=>{
+    if(db.items.some(i=>i.id===itemId && i.supplierId===sid)) filtered[itemId] = last[itemId];
+    else droppedCount++;
+  });
+  if(Object.keys(filtered).length===0){ showToast('上次訂購的品項都已經被刪除了，請重新挑選品項'); return; }
+  db.cart[sid] = filtered;
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
-  showToast('已複製上次訂單內容，可微調數量');
+  showToast(droppedCount>0 ? `已複製上次訂單內容（${droppedCount}項已刪除的品項自動略過）` : '已複製上次訂單內容，可微調數量');
 }
 
 /* ---------- 方格檢視切換 ---------- */
@@ -1310,15 +1368,18 @@ function renderCheckout(){
   let html='';
   for(const sid in db.cart){
     const s = db.suppliers.find(x=>x.id===sid);
+    if(!s) continue; // 供應商已被刪除，購物車殘留資料略過
     let sub=0;
     let rows='';
     for(const itemId in db.cart[sid]){
       const item = db.items.find(i=>i.id===itemId);
+      if(!item) continue; // 品項已被刪除，避免結帳頁面因為找不到資料而出錯
       const qty = db.cart[sid][itemId];
       const lineTotal = item.price*qty;
       sub += lineTotal;
       rows += `<div class="co-item"><span>${escapeHtml(item.name)}　x${qty}　（${escapeHtml(item.unit)}）</span><span>NTD ${money(lineTotal)}</span></div>`;
     }
+    if(!rows) continue;
     html += `<div class="supplier-block"><h3>${escapeHtml(s.name)}</h3>${rows}
       <div class="co-sub"><span>小計</span><span>NTD ${money(sub)}</span></div></div>`;
   }
@@ -1337,10 +1398,13 @@ function confirmCheckout(){
   const newOrders = [];
   for(const sid in db.cart){
     const s = db.suppliers.find(x=>x.id===sid);
+    if(!s) continue; // 供應商已被刪除，這筆購物車殘留資料略過
     const items = Object.keys(db.cart[sid]).map(itemId=>{
       const item = db.items.find(i=>i.id===itemId);
+      if(!item) return null; // 品項已被刪除（例如快速再訂複製到舊品項），略過避免結帳失敗
       return {code:item.code, name:item.name, unit:item.unit, price:item.price, qty:db.cart[sid][itemId]};
-    });
+    }).filter(Boolean);
+    if(items.length===0) continue; // 這家供應商購物車裡的品項全部都已經被刪除了，不產生空訂單
     const order = {
       id:'PO'+Date.now()+Math.floor(Math.random()*100),
       supplierId:sid, supplierName:s.name, items, deliveryDate:date, note,
@@ -1595,7 +1659,7 @@ function renderStock(){
       <div class="meta">${escapeHtml(it.code||'—')} · ${escapeHtml(s?.name||'')}</div></div></div>
       <div class="grid2">
         <div class="mini-field"><label>單價 NTD／${escapeHtml(it.unit)}</label>
-          <input type="number" value="${it.price}" ${isReadonly()?'disabled':''} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
+          <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
         <div class="mini-field"><label>結餘（盤點數量）</label>
           <input type="number" step="any" value="${it.stockQty||0}" ${isReadonly()?'disabled':''} onchange="updateStockQty('${it.id}', this.value); showSaved('${it.id}')"></div>
       </div>
@@ -1660,9 +1724,9 @@ function renderAdmin(){
   renderLicensePanel();
   document.getElementById('importCard').style.display = isMaintainer() ? 'block' : 'none';
   fillSettingsForm();
-  document.getElementById('settingShopName').disabled = isReadonly();
-  document.getElementById('settingAppSub').disabled = isReadonly();
-  document.getElementById('faviconUpload').disabled = isReadonly();
+  document.getElementById('settingShopName').disabled = !isStoreAdmin();
+  document.getElementById('settingAppSub').disabled = !isStoreAdmin();
+  document.getElementById('faviconUpload').disabled = !isStoreAdmin();
   document.getElementById('bgUpload').disabled = !isMaintainer();
   document.getElementById('bgPatternRow').style.opacity = isMaintainer() ? '1' : '.5';
   if(db.settings.bgPattern){
@@ -1670,13 +1734,19 @@ function renderAdmin(){
     bp.src = db.settings.bgPattern; bp.style.display='inline-block';
   }
   const wrap = document.getElementById('adminSupplierList');
-  wrap.innerHTML = db.suppliers.map(s=>{
-    const itemCount = db.items.filter(i=>i.supplierId===s.id).length;
-    return `<div class="supplier-manage-item">
-      <span>${escapeHtml(s.name)} <span style="color:var(--gray);font-size:11px;">（${itemCount}項・叫貨${s.freq||0}次）</span></span>
-      ${!isReadonly()?`<span class="del-x" onclick="deleteSupplier('${s.id}')">刪除</span>`:''}
-    </div>`;
-  }).join('') || '<div class="empty">尚無供應商</div>';
+  if(!isStoreAdmin()){
+    wrap.innerHTML = `<div class="log-row">供應商管理僅「管理者」以上身份可查看與操作</div>`;
+  } else {
+    wrap.innerHTML = db.suppliers.map(s=>{
+      const itemCount = db.items.filter(i=>i.supplierId===s.id).length;
+      return `<div class="supplier-manage-item">
+        <span>${escapeHtml(s.name)} <span style="color:var(--gray);font-size:11px;">（${itemCount}項・叫貨${s.freq||0}次）</span></span>
+        <span class="del-x" onclick="deleteSupplier('${s.id}')">刪除</span>
+      </div>`;
+    }).join('') || '<div class="empty">尚無供應商</div>';
+  }
+
+  renderItemManage();
 
   const logWrap = document.getElementById('priceLog');
   if(db.priceLog.length===0){ logWrap.innerHTML='<div class="empty">尚無單價異動紀錄</div>'; return; }
@@ -1684,8 +1754,39 @@ function renderAdmin(){
     <div class="log-row"><b>${escapeHtml(l.itemName)}</b>　NTD ${l.old} → NTD ${l.next}
       <br>${l.time}・操作角色：${escapeHtml(l.role)}</div>`).join('');
 }
+function renderItemManage(){
+  const sel = document.getElementById('itemManageSupplierSelect');
+  const wrap = document.getElementById('itemManageList');
+  if(!sel || !wrap) return;
+  const curVal = sel.value;
+  sel.innerHTML = db.suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  if(curVal && db.suppliers.some(s=>s.id===curVal)) sel.value = curVal;
+  const sid = sel.value;
+  if(!sid){ wrap.innerHTML=''; return; }
+  const items = db.items.filter(i=>i.supplierId===sid);
+  if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項</div>'; return; }
+  wrap.innerHTML = `<div class="card">` + items.map((it,idx)=>`
+    <div class="supplier-manage-item" style="flex-wrap:wrap;gap:8px;">
+      <div style="flex:1;min-width:150px;">
+        <div style="font-weight:600;">${escapeHtml(it.name)}</div>
+        <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--gray);">規格/單位</span>
+          <input type="text" value="${escapeHtml(it.unit)}" style="width:90px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
+            onchange="updateItemUnit('${it.id}', this.value)">
+          <span style="font-size:12px;color:var(--gray);">單價</span>
+          <input type="number" value="${it.price}" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
+            onchange="updateItemPrice('${it.id}', this.value)">
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+        <button class="icon-btn" style="padding:6px 10px;" ${!isStoreAdmin()||idx===0?'disabled':''} onclick="moveItem('${it.id}',-1)">▲</button>
+        <button class="icon-btn" style="padding:6px 10px;" ${!isStoreAdmin()||idx===items.length-1?'disabled':''} onclick="moveItem('${it.id}',1)">▼</button>
+        ${isStoreAdmin()?`<span class="del-x" onclick="deleteItem('${it.id}')">刪除</span>`:''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
 function deleteSupplier(id){
-  if(isReadonly()) return;
+  if(!isStoreAdmin()) return;
   db.suppliers = db.suppliers.filter(s=>s.id!==id);
   db.items = db.items.filter(i=>i.supplierId!==id);
   delete db.cart[id];
@@ -1782,6 +1883,48 @@ function renderAll(){
   updateCheckoutBar();
 }
 
+/* ---------- 資料修正：韓濟名味品拆分酒水／食材（只會執行一次，之後自動略過）---------- */
+function migrateHanjiSplit(){
+  const old = db.suppliers.find(s=>s.name==='韓濟名味品有限公司');
+  if(!old) return; // 沒有舊的合併供應商，代表已經拆過或本來就沒有，不用處理
+  const liquorGroup = FULL_SUPPLIER_IMPORT.find(g=>g.name==='韓濟名味品有限公司-酒水');
+  const liquorNames = new Set((liquorGroup?liquorGroup.items:[]).map(i=>i.name));
+  function ensureSupplier(name){
+    let s = db.suppliers.find(x=>x.name===name);
+    if(!s){ s = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0}; db.suppliers.push(s); }
+    return s;
+  }
+  const liquorSup = ensureSupplier('韓濟名味品有限公司-酒水');
+  const foodSup = ensureSupplier('韓濟名味品有限公司-食材');
+  db.items.forEach(it=>{
+    if(it.supplierId===old.id){
+      it.supplierId = liquorNames.has(it.name) ? liquorSup.id : foodSup.id;
+    }
+  });
+  liquorSup.freq = (liquorSup.freq||0) + Math.round((old.freq||0)/2);
+  foodSup.freq = (foodSup.freq||0) + Math.round((old.freq||0)/2);
+  if(db.cart[old.id]){
+    Object.keys(db.cart[old.id]).forEach(itemId=>{
+      const it = db.items.find(x=>x.id===itemId);
+      if(!it) return;
+      if(!db.cart[it.supplierId]) db.cart[it.supplierId]={};
+      db.cart[it.supplierId][itemId] = db.cart[old.id][itemId];
+    });
+    delete db.cart[old.id];
+  }
+  db.suppliers = db.suppliers.filter(s=>s.id!==old.id);
+  saveDB();
+}
+
+/* ---------- 角色精簡：舊角色名稱自動對應到新角色（只會執行一次，之後自動略過）---------- */
+function migrateRoles(){
+  let changed = false;
+  (db.accounts||[]).forEach(a=>{
+    if(LEGACY_ROLE_MAP[a.role]){ a.role = LEGACY_ROLE_MAP[a.role]; changed = true; }
+  });
+  if(changed) saveDB();
+}
+
 /* ---------- 初始化 ---------- */
 async function initApp(){
   applySettings();
@@ -1790,6 +1933,8 @@ async function initApp(){
   } else {
     setSyncStatus('offline');
   }
+  migrateHanjiSplit();
+  migrateRoles();
   const hint = document.getElementById('loginLoadingHint');
   if(hint) hint.style.display = 'none';
   initLogin(); // 登入成功後（loginAsAccount內）才會渲染供應商/訂單等業務資料
