@@ -334,6 +334,9 @@ body.readonly .readonly-badge{display:inline-block;}
   <div class="page-title">雲端同步設定 <span class="cnt">僅維護專員可設定</span></div>
   <div class="card" id="cloudSyncCard"></div>
 
+  <div class="page-title">資料備份／還原 <span class="cnt">僅維護專員可操作</span></div>
+  <div class="card" id="backupCard"></div>
+
   <div class="page-title">系統授權管理</div>
   <div class="card" id="licensePanel"></div>
 
@@ -384,12 +387,17 @@ body.readonly .readonly-badge{display:inline-block;}
   </div>
   <div class="card" id="adminSupplierList"></div>
 
-  <div class="page-title" style="margin-top:18px;">品項管理 <span class="cnt">可修改單位、排序、刪除</span></div>
+  <div class="page-title" style="margin-top:18px;">品項管理 <span class="cnt">可新增、修改單位、排序、刪除</span></div>
   <div class="card">
     <div class="field-row" style="margin-bottom:0;">
       <label>選擇供應商</label>
       <select id="itemManageSupplierSelect" onchange="renderItemManage()"></select>
     </div>
+  </div>
+  <div class="add-supplier-row" id="itemManageAddRow">
+    <input type="text" id="itemManageNewName" placeholder="新增品項名稱…">
+    <input type="text" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
+    <button class="icon-btn" onclick="addItemFromManage()">＋新增</button>
   </div>
   <div id="itemManageList"></div>
 
@@ -1020,10 +1028,17 @@ function applySettings(){
     document.body.style.backgroundRepeat = '';
   }
 }
+const MAX_BG_UPLOAD_BYTES = 1.5*1024*1024;   // 背景圖案上限 1.5MB
+const MAX_FAVICON_UPLOAD_BYTES = 300*1024;    // 圖示上限 300KB（本來就只需要小圖示）
 function onBgUpload(evt){
   if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
   const file = evt.target.files[0];
   if(!file) return;
+  if(file.size > MAX_BG_UPLOAD_BYTES){
+    showToast('圖片太大了（上限1.5MB），請用小一點的圖片，避免拖慢雲端同步');
+    evt.target.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = ()=>{
     db.settings.bgPattern = reader.result;
@@ -1051,11 +1066,18 @@ function onFaviconUpload(evt){
   if(!isStoreAdmin()) return;
   const file = evt.target.files[0];
   if(!file) return;
+  if(file.size > MAX_FAVICON_UPLOAD_BYTES){
+    showToast('圖示太大了（上限300KB），請用小一點的圖片');
+    evt.target.value = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = ()=>{
     db.settings.favicon = reader.result;
     const prev = document.getElementById('faviconPreview');
     prev.src = reader.result; prev.style.display='inline-block';
+    saveDB(); applySettings();
+    showToast('圖示已套用');
   };
   reader.readAsDataURL(file);
 }
@@ -1290,6 +1312,19 @@ function addItem(){
   document.getElementById('newItemName').value='';
   document.getElementById('newItemPrice').value='';
   saveDB(); renderItemList();
+  showToast('已新增品項');
+}
+function addItemFromManage(){
+  if(!isStoreAdmin()) return;
+  const sid = document.getElementById('itemManageSupplierSelect').value;
+  if(!sid){ showToast('請先選擇供應商'); return; }
+  const name = document.getElementById('itemManageNewName').value.trim();
+  const price = money(parseFloat(document.getElementById('itemManageNewPrice').value)||0);
+  if(!name) return;
+  db.items.push({id:'i'+Date.now(), supplierId:sid, code:'', name, unit:'份', price});
+  document.getElementById('itemManageNewName').value='';
+  document.getElementById('itemManageNewPrice').value='';
+  saveDB(); renderItemManage(); renderItemList();
   showToast('已新增品項');
 }
 function deleteItem(itemId){
@@ -1709,6 +1744,10 @@ function renderCloudSyncCard(){
     </div>
     <div style="font-size:12px;color:var(--gray);margin-top:8px;">
       設定好網址後，所有人操作的資料會自動同步到同一份雲端資料，不用手動按也會在儲存時自動上傳。
+    </div>
+    <div style="font-size:12px;color:var(--warn);margin-top:8px;font-weight:700;">
+      ⚠️ 這組網址是「${escapeHtml(db.settings.shopName||'本店')}」專屬的雲端資料表。若把這套系統複製給其他客戶當模板使用，
+      請務必在這裡改成新客戶自己的網址，否則新客戶的訂單資料會同步進這裡、混進本店資料。
     </div>`;
 }
 function onSaveGasUrl(){
@@ -1718,8 +1757,83 @@ function onSaveGasUrl(){
   if(val) pullFromCloud(true); else setSyncStatus('offline');
 }
 
+/* ---------- 資料備份／還原 ----------
+   刪除品項/供應商/帳號目前都是刪了就沒了，沒有回收機制。
+   這裡提供最直接可靠的救命繩：把整個資料庫匯出成一個.json備份檔，
+   之後不管是誤刪、誤改，還是雲端資料出問題，都可以用備份檔整包還原。
+   僅「維護專員」（晨諾創意）可操作，因為這是系統層級的救援功能。 */
+function renderBackupCard(){
+  const wrap = document.getElementById('backupCard');
+  if(!wrap) return;
+  if(!isMaintainer()){
+    wrap.innerHTML = `<div class="log-row">資料備份／還原僅「維護專員」身份可操作</div>`;
+    return;
+  }
+  const supN = db.suppliers.length, itN = db.items.length, orN = db.orders.length, accN = db.accounts.length;
+  wrap.innerHTML = `
+    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">
+      目前資料：${supN} 家供應商・${itN} 個品項・${orN} 筆訂單紀錄・${accN} 組帳號
+    </div>
+    <button class="icon-btn" style="width:100%;" onclick="exportBackup()">📦 匯出備份檔（.json）</button>
+    <div style="font-size:11px;color:var(--gray);margin:8px 0;">
+      建議每次改動比較大（例如匯入名單、調整很多品項）之後，順手匯出一份存起來，
+      萬一之後誤刪或改錯，都可以用下面的「還原備份」整包救回來。
+    </div>
+    <label class="icon-btn" style="width:100%;display:block;text-align:center;box-sizing:border-box;">
+      ♻️ 還原備份（上傳.json檔）
+      <input type="file" accept="application/json,.json" style="display:none;" onchange="importBackup(event)">
+    </label>
+    <div style="font-size:11px;color:var(--warn);font-weight:700;margin-top:6px;">
+      ⚠️ 還原備份會整包覆蓋目前所有資料（供應商、品項、訂單、帳號…），且會同步覆蓋雲端，請務必確認備份檔案沒錯再上傳。
+    </div>`;
+}
+function exportBackup(){
+  if(!isMaintainer()){ showToast('只有「維護專員」能匯出備份'); return; }
+  const ts = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fname = `${(db.settings.shopName||'叫貨系統')}_備份_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('備份檔已下載：' + fname);
+}
+function importBackup(evt){
+  if(!isMaintainer()){ showToast('只有「維護專員」能還原備份'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let parsed;
+    try{ parsed = JSON.parse(reader.result); }
+    catch(e){ showToast('這個檔案打不開，不是有效的備份檔'); evt.target.value=''; return; }
+    if(!parsed || !Array.isArray(parsed.suppliers) || !Array.isArray(parsed.items) || !Array.isArray(parsed.accounts)){
+      showToast('這個檔案格式不對，看起來不是本系統的備份檔');
+      evt.target.value=''; return;
+    }
+    const ok = confirm(
+      `確定要用這份備份檔還原嗎？\n\n備份內容：${parsed.suppliers.length}家供應商・${parsed.items.length}個品項・${(parsed.orders||[]).length}筆訂單・${parsed.accounts.length}組帳號\n\n這個動作會覆蓋目前所有資料（包含雲端），且無法復原。建議先按上面「匯出備份檔」保留目前的資料再繼續。`
+    );
+    if(!ok){ evt.target.value=''; return; }
+    db = parsed;
+    saveDBLocalOnly();
+    applySettings();
+    renderAll();
+    renderAdmin();
+    renderLicenseBanner();
+    renderLicenseGate();
+    saveDB(); // 觸發雲端同步，讓還原後的資料推上雲端、覆蓋掉舊的
+    showToast('已還原備份，資料已更新並同步至雲端');
+    evt.target.value='';
+  };
+  reader.readAsText(file);
+}
+
 function renderAdmin(){
   renderCloudSyncCard();
+  renderBackupCard();
   renderAccountManage();
   renderLicensePanel();
   document.getElementById('importCard').style.display = isMaintainer() ? 'block' : 'none';
@@ -1758,6 +1872,8 @@ function renderItemManage(){
   const sel = document.getElementById('itemManageSupplierSelect');
   const wrap = document.getElementById('itemManageList');
   if(!sel || !wrap) return;
+  const addRow = document.getElementById('itemManageAddRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
   const curVal = sel.value;
   sel.innerHTML = db.suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
   if(curVal && db.suppliers.some(s=>s.id===curVal)) sel.value = curVal;
@@ -1835,9 +1951,18 @@ function renderAccountManage(){
   wrap.innerHTML = db.accounts.map(a=>`
     <div class="supplier-manage-item">
       <span>${escapeHtml(a.name)}（${escapeHtml(a.role)}）<br>
-        <span style="color:var(--gray);font-size:12px;">帳號：${escapeHtml(a.account)}／密碼：${escapeHtml(a.password)}</span></span>
+        <span style="color:var(--gray);font-size:12px;">帳號：${escapeHtml(a.account)}／密碼：
+          <span id="pw-${a.id}" style="cursor:pointer;letter-spacing:1px;" onclick="toggleAccountPassword('${a.id}')" title="點一下顯示/隱藏">••••</span>
+        </span></span>
       <span class="del-x" onclick="deleteAccount('${a.id}')">刪除</span>
     </div>`).join('') || '<div class="empty">尚無帳號</div>';
+}
+function toggleAccountPassword(id){
+  const el = document.getElementById('pw-'+id);
+  if(!el) return;
+  const a = db.accounts.find(x=>x.id===id);
+  if(!a) return;
+  el.textContent = el.textContent==='••••' ? a.password : '••••';
 }
 function addAccount(){
   if(!isMaintainer()) return;
