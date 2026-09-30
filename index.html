@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, interactive-widget=resizes-content">
 <title id="pageTitleTag">燒酒烤烤豬｜叫貨系統</title>
 <link rel="icon" id="faviconLink" href="data:,">
 <style>
@@ -1961,6 +1961,21 @@ function mergeDuplicateSuppliers(){
     saveDB();
   }
 }
+
+/* ---------- 手機鍵盤把輸入框擋住/跳出畫面的修正 ----------
+   手機瀏覽器跳出數字鍵盤時，畫面下方固定的「結帳列」「底部導覽列」
+   有時候會蓋住或把正在輸入的欄位擠出可視範圍，導致「點進去有時候會跳出來」。
+   用事件委派監聽全站所有欄位，鍵盤動畫跑完後（約0.3秒）自動把該欄位
+   捲動到畫面看得到、打得到字的位置。*/
+document.addEventListener('focusin', function(e){
+  const el = e.target;
+  if(el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT'){
+    clearTimeout(window._scrollFixTimer);
+    window._scrollFixTimer = setTimeout(()=>{
+      el.scrollIntoView({block:'center', behavior:'smooth'});
+    }, 300);
+  }
+});
 
 /* ---------- 初始化 ---------- */
 async function initApp(){
