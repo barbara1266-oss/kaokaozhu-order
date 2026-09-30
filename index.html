@@ -1671,7 +1671,7 @@ function confirmCheckout(){
     const items = Object.keys(db.cart[sid]).map(itemId=>{
       const item = db.items.find(i=>i.id===itemId);
       if(!item) return null; // 品項已被刪除（例如快速再訂複製到舊品項），略過避免結帳失敗
-      return {code:item.code, name:item.name, unit:item.unit, price:item.price, qty:db.cart[sid][itemId]};
+      return {itemId:item.id, code:item.code, name:item.name, unit:item.unit, price:item.price, qty:db.cart[sid][itemId]};
     }).filter(Boolean);
     if(items.length===0) continue; // 這家供應商購物車裡的品項全部都已經被刪除了，不產生空訂單
     const createdAtISO = nowISO();
@@ -1835,7 +1835,7 @@ function openReceiveDetail(orderId){
   const wrap = document.getElementById('receiveList');
   let rows = o.items.map((it,idx)=>`
     <div class="recv-item" id="recv-${idx}" style="flex-direction:column;align-items:stretch;gap:6px;">
-      <span>${escapeHtml(it.name)}（訂 x${it.qty}　${escapeHtml(it.unit)}，訂購單價 NTD ${it.price}）</span>
+      <span>${escapeHtml(it.name)}${it.added?' <span style="color:var(--brand);font-weight:700;">〔臨時追加〕</span>':''}（訂 x${it.qty}　${escapeHtml(it.unit)}，訂購單價 NTD ${it.price}）</span>
       <div style="display:flex;justify-content:space-between;gap:10px;">
         <span style="flex:1;">實收數量
           <input type="number" step="any" value="${it.qty}" data-idx="${idx}" data-field="qty" style="width:100%;"
@@ -1846,19 +1846,112 @@ function openReceiveDetail(orderId){
       </div>
       <div style="text-align:right;font-size:12px;color:var(--gray);">小計 NTD <span id="lineTotal-${idx}">${money(it.qty*it.price)}</span></div>
     </div>`).join('');
+  const addLogHtml = (o.addLog && o.addLog.length) ? `
+    <div style="margin-top:10px;background:var(--gray-bg);border-radius:10px;padding:8px 10px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px;">📝 臨時追加紀錄</div>
+      ${o.addLog.map(l=>`<div class="log-row">${escapeHtml(l.itemName)} x${l.qty}　<span style="color:var(--gray);">${l.at}・${escapeHtml(l.role||'')}追加</span></div>`).join('')}
+    </div>` : '';
   wrap.innerHTML = `<div class="card">
     <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(o.supplierName)}</div>
     <div style="font-size:11px;color:var(--gray);margin-bottom:2px;">數量／單價都可修改，跟送貨單金額不同時請直接調整</div>
     <div style="font-size:12px;color:var(--brand);font-weight:700;margin-bottom:10px;">↩️ 如遇退貨，數量或金額可直接輸入負數（例如 -2），系統會自動從總額扣除</div>
     ${rows}
+    ${addLogHtml}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;
       padding-top:12px;border-top:2px solid var(--charcoal);font-size:16px;font-weight:700;">
       <span>這筆訂單實收總額</span><span>NTD <span id="receiveGrandTotal">${money(o.items.reduce((s,it)=>s+it.qty*it.price,0))}</span></span>
     </div>
     <div style="font-size:11px;color:var(--gray);text-align:right;margin-top:2px;">請跟供應商送貨單上的金額核對</div>
+    ${(o.status==='sent' && !isReadonly())?`<button class="icon-btn" style="width:100%;margin-top:10px;" onclick="openAddItemsToOrder('${orderId}')">➕ 這張單還沒收貨，臨時追加品項</button>`:''}
     ${!isReadonly()?`<button class="all-ok-btn" onclick="allOkReceive('${orderId}')">✓ 全部到齊、金額無誤，一鍵確認</button>
     <button class="confirm-recv-btn" onclick="confirmReceive('${orderId}')">確認收貨並封存</button>`:''}
     <div style="text-align:center;margin-top:10px;"><span onclick="renderReceive()" style="font-size:12px;color:var(--gray);">‹ 返回列表</span></div>
+  </div>`;
+}
+/* ---------- 已送出訂單臨時追加品項（Eva實測需求：漏叫、緊急追加時，不用再開一張新單） ----------
+   限制在status==='sent'（還沒收貨確認）的單子上才能用，一旦收貨確認封存（status==='done'）
+   就不能再追加，避免帳務對不上。每次追加都寫進o.addLog留紀錄，畫面上也會標記「臨時追加」，
+   讓大家知道這張單被動過、動了什麼，不是偷偷改掉原單內容。 */
+function openAddItemsToOrder(orderId){
+  if(isReadonly()) return;
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o || o.status!=='sent') return;
+  const wrap = document.getElementById('receiveList');
+  const items = sortedItemsForSupplier(o.supplierId);
+  if(items.length===0){ wrap.innerHTML = `<div class="card"><div class="empty">這家供應商目前沒有品項可以追加</div>
+    <div style="text-align:center;margin-top:10px;"><span onclick="openReceiveDetail('${orderId}')" style="font-size:12px;color:var(--gray);">‹ 返回</span></div></div>`; return; }
+  const rows = items.map(it=>`
+    <div class="item-row" id="addpick-${it.id}">
+      <div class="item-info">
+        <div class="item-name">${escapeHtml(it.name)}</div>
+        <div class="item-price-row">單價 NTD ${it.price}／${escapeHtml(it.unit)}</div>
+      </div>
+      <div class="item-controls">
+        <input type="number" step="any" min="0" class="qty-input" data-additem="${it.id}" placeholder="0">
+      </div>
+    </div>`).join('');
+  wrap.innerHTML = `<div class="card">
+    <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(o.supplierName)}－臨時追加品項</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">填要追加的數量，跟這張單原本的品項無關，只會加不會改到原本訂的內容</div>
+    ${rows}
+    <button class="all-ok-btn" style="margin-top:12px;" onclick="confirmAddItemsToOrder('${orderId}')">確認追加</button>
+    <div style="text-align:center;margin-top:10px;"><span onclick="openReceiveDetail('${orderId}')" style="font-size:12px;color:var(--gray);">‹ 取消，返回這張單</span></div>
+  </div>`;
+}
+function confirmAddItemsToOrder(orderId){
+  if(isReadonly()) return;
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o || o.status!=='sent') return;
+  const inputs = document.querySelectorAll('input[data-additem]');
+  let addedCount = 0;
+  const addedThisRound = []; // 只記這次追加的品項，等一下產生「追加通知」文字用，不要把原本訂的品項也混進去
+  const nowLabel = new Date().toLocaleString('zh-TW',{hour12:false});
+  if(!o.addLog) o.addLog = [];
+  inputs.forEach(inp=>{
+    const qty = parseFloat(inp.value);
+    if(!qty || qty<=0) return;
+    const itemId = inp.getAttribute('data-additem');
+    const item = db.items.find(i=>i.id===itemId);
+    if(!item) return;
+    const existing = o.items.find(x=>x.itemId===itemId);
+    if(existing){ existing.qty += qty; }
+    else { o.items.push({itemId:item.id, code:item.code, name:item.name, unit:item.unit, price:item.price, qty, added:true}); }
+    o.addLog.push({itemName:item.name, qty, at:nowLabel, atISO:nowISO(), role: currentAccount?currentAccount.role:''});
+    addedThisRound.push({name:item.name, qty, unit:item.unit});
+    addedCount++;
+  });
+  if(addedCount===0){ showToast('沒有填寫要追加的數量'); return; }
+  o.updatedAt = nowISO();
+  saveDB();
+  openAddedItemsShare(o, addedThisRound);
+  showToast(`已追加${addedCount}項品項到這張單`);
+}
+/* 追加完之後，直接把「這次追加了什麼」整理成一段文字，方便馬上轉發給供應商
+   （Eva實測的情境是賣完臨時缺貨、要緊急跟供應商追加，不是回頭看訂單而已），
+   不用再回原本的分享畫面重新組一次全部品項，也不會把原本訂的品項混進去搞混供應商。 */
+function buildAddedItemsLineText(order, addedLines){
+  let lines = [];
+  lines.push(`【追加叫貨】${order.supplierName}`);
+  lines.push(`原訂單編號：${order.id}`);
+  lines.push('———');
+  addedLines.forEach(it=>{ lines.push(`${it.name}　x${it.qty}　（${it.unit}）`); });
+  lines.push('———');
+  lines.push('以上為原訂單之外，臨時追加的品項，麻煩一併出貨，謝謝！');
+  return lines.join('\n');
+}
+function openAddedItemsShare(order, addedLines){
+  const wrap = document.getElementById('receiveList');
+  const text = buildAddedItemsLineText(order, addedLines);
+  const encoded = encodeURIComponent(text);
+  window.__addedShareText = text;
+  wrap.innerHTML = `<div class="card">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--brand);">✓ 已追加，要不要順便通知供應商？</div>
+    <div class="line-preview">${escapeHtml(text)}</div>
+    <div class="share-row">
+      <button class="btn-line" onclick="window.open('https://line.me/R/share?text=${encoded}','_blank')">開啟LINE分享</button>
+      <button class="btn-copy" onclick="navigator.clipboard?.writeText(window.__addedShareText).then(()=>showToast('已複製文字，可貼到LINE')).catch(()=>showToast('複製失敗，請手動選取文字'))">複製文字</button>
+    </div>
+    <div style="text-align:center;margin-top:14px;"><span onclick="openReceiveDetail('${order.id}')" style="font-size:12px;color:var(--gray);">‹ 不用了，返回這張單</span></div>
   </div>`;
 }
 function onReceiveFieldChange(orderId, idx){
