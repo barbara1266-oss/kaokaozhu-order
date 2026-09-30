@@ -1563,7 +1563,7 @@ function openReceiveDetail(orderId){
   const wrap = document.getElementById('receiveList');
   let rows = o.items.map((it,idx)=>`
     <div class="recv-item" id="recv-${idx}" style="flex-direction:column;align-items:stretch;gap:6px;">
-      <span>${escapeHtml(it.name)}（訂 x${it.qty}　${it.unit}，訂購單價 NTD ${it.price}）</span>
+      <span>${escapeHtml(it.name)}（訂 x${it.qty}　${escapeHtml(it.unit)}，訂購單價 NTD ${it.price}）</span>
       <div style="display:flex;justify-content:space-between;gap:10px;">
         <span style="flex:1;">實收數量
           <input type="number" step="any" value="${it.qty}" data-idx="${idx}" data-field="qty" style="width:100%;"
@@ -1925,6 +1925,43 @@ function migrateRoles(){
   if(changed) saveDB();
 }
 
+/* ---------- 防呆：合併同名供應商 ----------
+   兩台裝置同時第一次載入、同時觸發 migrateHanjiSplit() 的極端情況下，
+   有可能各自建立一份「韓濟名味品有限公司-食材/酒水」並各自推上雲端，
+   造成同名供應商重複。這裡在每次啟動時掃一次，若真的出現同名，
+   自動把品項/購物車/上次叫貨紀錄併到先出現的那筆，並移除多餘的重複，
+   避免看到兩個一樣名字的供應商或品項憑空消失。 */
+function mergeDuplicateSuppliers(){
+  const byName = {};
+  let changed = false;
+  db.suppliers.forEach(s=>{
+    const keep = byName[s.name];
+    if(keep){
+      db.items.forEach(it=>{ if(it.supplierId===s.id) it.supplierId = keep.id; });
+      if(db.cart[s.id]){
+        db.cart[keep.id] = db.cart[keep.id] || {};
+        Object.keys(db.cart[s.id]).forEach(itemId=>{
+          db.cart[keep.id][itemId] = (db.cart[keep.id][itemId]||0) + db.cart[s.id][itemId];
+        });
+        delete db.cart[s.id];
+      }
+      if(db.lastOrderBySupplier && db.lastOrderBySupplier[s.id]){
+        if(!db.lastOrderBySupplier[keep.id]) db.lastOrderBySupplier[keep.id] = db.lastOrderBySupplier[s.id];
+        delete db.lastOrderBySupplier[s.id];
+      }
+      keep.freq = (keep.freq||0) + (s.freq||0);
+      s._dupMarked = true;
+      changed = true;
+    } else {
+      byName[s.name] = s;
+    }
+  });
+  if(changed){
+    db.suppliers = db.suppliers.filter(s=>!s._dupMarked);
+    saveDB();
+  }
+}
+
 /* ---------- 初始化 ---------- */
 async function initApp(){
   applySettings();
@@ -1935,6 +1972,7 @@ async function initApp(){
   }
   migrateHanjiSplit();
   migrateRoles();
+  mergeDuplicateSuppliers();
   const hint = document.getElementById('loginLoadingHint');
   if(hint) hint.style.display = 'none';
   initLogin(); // 登入成功後（loginAsAccount內）才會渲染供應商/訂單等業務資料
