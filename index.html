@@ -742,6 +742,10 @@ function money(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n); }
 
 const DB_KEY = 'kklz_order_system_v1';
 const GAS_URL_KEY = 'kklz_gas_url';
+// 2026-10-01新增：記錄「本機還有異動尚未成功送到雲端」。存在localStorage而不是
+// 記憶體變數，是因為事故發生的那種情境（手機切到LINE分享訂單時分頁被系統中斷/
+// 整個重新整理）剛好會把記憶體變數清掉，但localStorage不會，才攔得住。
+const PENDING_SYNC_KEY = 'kklz_pending_sync_v1';
 const ROLES = ['維護專員','管理者','叫貨者','營運(唯讀)'];
 const LEGACY_ROLE_MAP = {'店經理':'叫貨者','採購':'叫貨者','後台驗收':'叫貨者','預備人員':'叫貨者'}; // 舊角色名稱自動對應到新角色
 /* 權限分三層：
@@ -783,6 +787,7 @@ function saveDB(){
   }catch(e){
     setSyncStatus('error');
   }
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){} // 標記「這筆異動還沒送到雲端」，成功push後才清掉
   queueCloudSync();
 }
 function setSyncStatus(mode){
@@ -834,50 +839,65 @@ function pushToCloud(){
     try{
       if(res && res.ok && res.data){
         const remote = JSON.parse(res.data);
-        if(Array.isArray(remote.accounts)){
-          const localIds = new Set(db.accounts.map(a=>a.id));
-          const localNames = new Set(db.accounts.map(a=>(a.account||'').toLowerCase()));
-          remote.accounts.forEach(ra=>{
-            if(!localIds.has(ra.id) && !localNames.has((ra.account||'').toLowerCase())){
-              db.accounts.push(ra);
-              localIds.add(ra.id); localNames.add((ra.account||'').toLowerCase());
-            }
-          });
-        }
-        if(Array.isArray(remote.items)){
-          const r = mergeRecordsWithTombstones(db.items, remote.items, db.deletedItemIds, remote.deletedItemIds);
-          db.items = r.merged; db.deletedItemIds = r.tombstones;
-        }
-        if(Array.isArray(remote.suppliers)){
-          const r = mergeRecordsWithTombstones(db.suppliers, remote.suppliers, db.deletedSupplierIds, remote.deletedSupplierIds);
-          db.suppliers = r.merged; db.deletedSupplierIds = r.tombstones;
-        }
-        if(Array.isArray(remote.orders)){
-          db.orders = mergeAppendOnlyById(db.orders, remote.orders, 'updatedAt');
-          sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 維持新到舊排序（畫面「最近10筆」等依此排序）
-        }
-        if(Array.isArray(remote.priceLog)){
-          db.priceLog = mergeAppendOnlyById(db.priceLog, remote.priceLog, 'timeISO');
-          sortByTimeFieldDesc(db.priceLog, 'timeISO'); // 維持新到舊排序（畫面「最近30筆」依此排序）
-        }
-        if(remote.settings && typeof remote.settings==='object'){
-          if((remote.settings.updatedAt||EPOCH_ISO) > (db.settings.updatedAt||EPOCH_ISO)){
-            db.settings = remote.settings;
-            normalizeDbShape(); // 對方的settings可能是還沒升級過的舊格式，補齊欄位避免畫面顯示異常
-          }
-        }
-        // 購物車是「打到一半的訂單」，不是歷史紀錄，沒辦法逐筆比對誰改了什麼，
-        // 用整包比較cartUpdatedAt決定誰的購物車內容比較新，避免正在打單的裝置被舊裝置蓋掉。
-        if(remote.cart && typeof remote.cart==='object'){
-          if((remote.cartUpdatedAt||EPOCH_ISO) > (db.cartUpdatedAt||EPOCH_ISO)){
-            db.cart = remote.cart;
-            db.cartUpdatedAt = remote.cartUpdatedAt||EPOCH_ISO;
-          }
-        }
+        mergeRemoteIntoLocal(remote);
       }
     }catch(e){ /* 雲端現況讀不到或格式異常，不影響原本要送出的本機資料 */ }
     doPushToCloud();
   }).catch(()=>{ doPushToCloud(); }); // 讀取雲端現況失敗（例如離線）也不要卡住，照常送出本機資料
+}
+// 2026-10-01 修正：這一段原本分別寫在pushToCloud()（push前偷看雲端合併）跟
+// pullFromCloud()（直接db=remote整包蓋掉）兩個地方，邏輯不一致。事故成因：
+// 手機瀏覽器切到LINE分享訂單時常常會把分頁背景化甚至整個reload，導致剛送出的
+// 訂單那一次push還沒真的送到雲端就被中斷；使用者回到系統時initApp()一定會先
+// pullFromCloud()，舊版那裡是「整包蓋掉」，就把這筆還沒送出去、只存在本機的
+// 新訂單直接洗掉、永遠消失（品饌供應商那張單就是這樣不見的）。
+// 修正方式：pull跟push共用同一套「合併」邏輯（id+時間戳記+刪除墓碑），不管是
+// push前偷看雲端、還是pull整包拉回來，都不會用雲端資料「蓋掉」本機還沒送出去
+// 的異動，只會合併取較新的一份。
+function mergeRemoteIntoLocal(remote){
+  if(Array.isArray(remote.accounts)){
+    const localIds = new Set(db.accounts.map(a=>a.id));
+    const localNames = new Set(db.accounts.map(a=>(a.account||'').toLowerCase()));
+    remote.accounts.forEach(ra=>{
+      if(!localIds.has(ra.id) && !localNames.has((ra.account||'').toLowerCase())){
+        db.accounts.push(ra);
+        localIds.add(ra.id); localNames.add((ra.account||'').toLowerCase());
+      }
+    });
+  }
+  if(Array.isArray(remote.items)){
+    const r = mergeRecordsWithTombstones(db.items, remote.items, db.deletedItemIds, remote.deletedItemIds);
+    db.items = r.merged; db.deletedItemIds = r.tombstones;
+  }
+  if(Array.isArray(remote.suppliers)){
+    const r = mergeRecordsWithTombstones(db.suppliers, remote.suppliers, db.deletedSupplierIds, remote.deletedSupplierIds);
+    db.suppliers = r.merged; db.deletedSupplierIds = r.tombstones;
+  }
+  if(Array.isArray(remote.orders)){
+    db.orders = mergeAppendOnlyById(db.orders, remote.orders, 'updatedAt');
+    sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 維持新到舊排序（畫面「最近10筆」等依此排序）
+  }
+  if(Array.isArray(remote.priceLog)){
+    db.priceLog = mergeAppendOnlyById(db.priceLog, remote.priceLog, 'timeISO');
+    sortByTimeFieldDesc(db.priceLog, 'timeISO'); // 維持新到舊排序（畫面「最近30筆」依此排序）
+  }
+  if(remote.settings && typeof remote.settings==='object'){
+    if((remote.settings.updatedAt||EPOCH_ISO) > (db.settings.updatedAt||EPOCH_ISO)){
+      db.settings = remote.settings;
+      normalizeDbShape(); // 對方的settings可能是還沒升級過的舊格式，補齊欄位避免畫面顯示異常
+    }
+  }
+  // 購物車是「打到一半的訂單」，不是歷史紀錄，沒辦法逐筆比對誰改了什麼，
+  // 用整包比較cartUpdatedAt決定誰的購物車內容比較新，避免正在打單的裝置被舊裝置蓋掉。
+  if(remote.cart && typeof remote.cart==='object'){
+    if((remote.cartUpdatedAt||EPOCH_ISO) > (db.cartUpdatedAt||EPOCH_ISO)){
+      db.cart = remote.cart;
+      db.cartUpdatedAt = remote.cartUpdatedAt||EPOCH_ISO;
+    }
+  }
+  if(remote.lastOrderBySupplier && typeof remote.lastOrderBySupplier==='object'){
+    db.lastOrderBySupplier = Object.assign({}, remote.lastOrderBySupplier, db.lastOrderBySupplier);
+  }
 }
 function doPushToCloud(){
   const url = getGasUrl();
@@ -888,6 +908,9 @@ function doPushToCloud(){
     body: JSON.stringify(db),
   }).then(r=>r.json()).then(res=>{
     setSyncStatus(res && res.ok ? 'synced' : 'error');
+    if(res && res.ok){
+      try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){} // 這次送出的就是目前最新的db，確定送達雲端了才清掉標記
+    }
     // 如果剛剛push前偷偷合併回了帳號/品項/供應商/訂單/設定，畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
     if(res && res.ok && currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
   }).catch(()=>{ setSyncStatus('error'); })
@@ -904,11 +927,24 @@ function pullFromCloud(showMsg){
     if(res && res.ok && res.data){
       try{
         const remote = JSON.parse(res.data);
-        db = remote;
+        let hasPendingLocalChanges = false;
+        try{ hasPendingLocalChanges = !!localStorage.getItem(PENDING_SYNC_KEY); }catch(e){}
+        if(hasPendingLocalChanges){
+          // 本機有異動還沒成功送到雲端過（例如剛建立訂單、手機切去LINE分享時分頁被系統
+          // 中斷或整個重新整理，push還沒送完）。絕對不能這時候直接拿雲端資料整包蓋掉
+          // 本機——這正是品饌那張單消失的原因。改成跟push前一樣的合併邏輯（id+時間戳記+
+          // 刪除墓碑），本機這筆還沒送出去的異動留著，再補送一次把它真的送上雲端。
+          mergeRemoteIntoLocal(remote);
+        } else {
+          // 本機沒有待送出的異動，單純拿雲端最新狀態為準（例如全新裝置第一次打開，
+          // 這裡直接整包覆蓋，避免內建示範資料殘留跟真實資料混在一起）。
+          db = remote;
+        }
         normalizeDbShape(); // 雲端資料可能是還沒升級過的舊格式，缺deletedItemIds等新欄位的話下面migrate系列會直接壞掉，這裡先補齊
         sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 雲端資料可能是舊裝置整包蓋上去、沒排序過的，這裡重新排序，避免「最近幾筆」的畫面顯示錯亂
         sortByTimeFieldDesc(db.priceLog, 'timeISO');
         saveDBLocalOnly();
+        if(hasPendingLocalChanges) queueCloudSync(); // 合併完本機還有異動沒送出去，馬上補送一次，確定真的到雲端
         // 雲端拉回來的資料可能是別的裝置還沒跑過修正的舊格式（例如舊版供應商
         // 名稱、舊角色名稱、意外重複的供應商），這裡每次從雲端整包蓋回本機
         // 之後都重新跑一次修正，不只是開頁面第一次載入時才跑。
