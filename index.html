@@ -748,6 +748,12 @@ const GAS_URL_KEY = 'kklz_gas_url';
 // 記憶體變數，是因為事故發生的那種情境（手機切到LINE分享訂單時分頁被系統中斷/
 // 整個重新整理）剛好會把記憶體變數清掉，但localStorage不會，才攔得住。
 const PENDING_SYNC_KEY = 'kklz_pending_sync_v1';
+// 2026-10-01全面體檢時新增：單純用「這次push成不成功」決定要不要清掉PENDING_SYNC_KEY
+// 不夠精準——如果push送出去之後、回應回來之前，又有別的異動發生（不管是不是同一筆），
+// 這次push的回應代表的只是「送出當下那個時間點的資料有沒有到」，不代表「現在最新的
+// 本機狀態都到齊了」。用一個單調遞增的版本號，push開始時記下目前版本，回應回來時
+// 只有「版本號完全沒變過」才代表這段期間沒有新異動插進來，才能真的清掉旗標。
+let localChangeVersion = 0;
 const ROLES = ['維護專員','管理者','叫貨者','營運(唯讀)'];
 const LEGACY_ROLE_MAP = {'店經理':'叫貨者','採購':'叫貨者','後台驗收':'叫貨者','預備人員':'叫貨者'}; // 舊角色名稱自動對應到新角色
 /* 權限分三層：
@@ -782,6 +788,23 @@ function loadDB(){
   }catch(e){}
   return seedDB();
 }
+// 2026-10-01新增：統一操作紀錄。前台任何「新增／修改／刪除／狀態變更」的動作，
+// 呼叫這個函式記一筆進db.actionLog（誰、什麼時候、做了什麼、對象、內容摘要），
+// 之後跟著正常的push流程一起送到後台，後端append進「操作紀錄」分頁，永久留痕。
+// action: 中文動作名稱（新增品項／刪除品項／下單／收貨確認…）
+// target: 這個動作是對誰做的（供應商名稱／訂單編號…）
+// summary: 一句話內容摘要
+function logAction(action, target, summary){
+  const who = currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入';
+  db.actionLog.push({
+    id: 'log'+Date.now()+Math.floor(Math.random()*10000),
+    time: nowISO(),
+    account: who,
+    action,
+    target: target||'',
+    summary: summary||'',
+  });
+}
 function saveDB(){
   try{
     localStorage.setItem(DB_KEY, JSON.stringify(db));
@@ -790,6 +813,7 @@ function saveDB(){
     setSyncStatus('error');
   }
   try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){} // 標記「這筆異動還沒送到雲端」，成功push後才清掉
+  localChangeVersion++; // 記一筆「本機又變了」，push完成時用來判斷這次送出的是不是最新版本
   queueCloudSync();
 }
 function setSyncStatus(mode){
@@ -837,9 +861,19 @@ function pushToCloud(){
 //   true＝確定送達雲端，而且本機db已經套用雲端合併完的最終結果
 //   false＝沒送成功（網路問題、雲端忙線中等），本機db維持原樣不變，呼叫端要自己決定要不要重試
 // 下單結帳（confirmCheckout）會直接await這個函式，等到true才會顯示「完成」、才能分享LINE。
+// lastPushRemoteData：記錄「最近一次push、伺服器實際回傳的合併結果」，給結帳流程
+// 二次驗證用——不能用push完之後的db.orders來驗證，因為db現在是「合併」而不是
+// 整包蓋掉（見下方說明），本機早就知道自己剛加的訂單，merge完db.orders一定找得到，
+// 這樣驗證不出「伺服器那邊是不是真的也收到了」，一定要看伺服器原始回應才算數。
+let lastPushRemoteData = null;
+let versionAtLastPushStart = -1; // 這次push開始「送出當下」的localChangeVersion，
+                                   // push完成時拿現在的版本號比對，判斷這段期間有沒有新異動插進來
 async function pushOnce_(){
   const url = getGasUrl();
   if(!url) return false;
+  lastPushRemoteData = null; // 每次呼叫一開始先清掉，避免這次其實走舊版相容路徑
+                              // （沒有res.data），卻誤用上一次成功的舊資料去驗證這一次
+  versionAtLastPushStart = localChangeVersion;
   try{
     const r = await fetch(url, {
       method:'POST',
@@ -849,9 +883,17 @@ async function pushOnce_(){
     const res = await r.json();
     if(!res || !res.ok) return false;
     if(res.data){
-      // 新版後端：雲端那邊已經把「本機送來的資料」跟「雲端原本的資料」合併好了，
-      // 直接套用這個最終結果就好，不用前端自己再合併一次。
-      db = JSON.parse(res.data);
+      // 2026-10-01抓到的真正根因：這裡原本是「db = JSON.parse(res.data)」整包蓋掉。
+      // 如果這次push送出之後、回應還沒回來之前這段期間（2-6秒），本機又因為別的
+      // 原因新增了資料（最典型：結帳時剛好有一個更早、還在background排隊中的push
+      // 同時在跑，等它的回應回來時，結帳剛加進db.orders的新訂單還沒被送出去），
+      // 整包蓋掉就會把這段期間新增的東西洗掉——這就是品饌訂單消失的真正原因。
+      // 改成跟pull/legacy路徑同一套「合併」（mergeRemoteIntoLocal，id+時間戳記判斷），
+      // 不管這個回應跟本機最新狀態誰先誰後，都只會「補上雲端有、本機沒有的」，
+      // 不會把本機這段期間新增的東西洗掉。
+      const remote = JSON.parse(res.data);
+      lastPushRemoteData = remote; // 存起來給結帳的二次驗證用，驗證要看「伺服器真的回了什麼」
+      mergeRemoteIntoLocal(remote);
       normalizeDbShape();
       sortByTimeFieldDesc(db.orders, 'createdAtISO');
       sortByTimeFieldDesc(db.priceLog, 'timeISO');
@@ -913,12 +955,19 @@ function mergeRemoteIntoLocal(remote){
     db.suppliers = r.merged; db.deletedSupplierIds = r.tombstones;
   }
   if(Array.isArray(remote.orders)){
-    db.orders = mergeAppendOnlyById(db.orders, remote.orders, 'updatedAt');
+    // 2026-10-01：訂單原本是「只會新增不會刪除」，改成跟品項/供應商一樣用墓碑機制，
+    // 因為新增了管理員刪單功能（刪除測試訂單等情境），要支援刪除才能正確同步到多裝置。
+    const r = mergeRecordsWithTombstones(db.orders, remote.orders, db.deletedOrderIds, remote.deletedOrderIds);
+    db.orders = r.merged; db.deletedOrderIds = r.tombstones;
     sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 維持新到舊排序（畫面「最近10筆」等依此排序）
   }
   if(Array.isArray(remote.priceLog)){
     db.priceLog = mergeAppendOnlyById(db.priceLog, remote.priceLog, 'timeISO');
     sortByTimeFieldDesc(db.priceLog, 'timeISO'); // 維持新到舊排序（畫面「最近30筆」依此排序）
+  }
+  if(Array.isArray(remote.actionLog)){
+    db.actionLog = mergeAppendOnlyById(db.actionLog, remote.actionLog, 'time');
+    sortByTimeFieldDesc(db.actionLog, 'time');
   }
   if(remote.settings && typeof remote.settings==='object'){
     if((remote.settings.updatedAt||EPOCH_ISO) > (db.settings.updatedAt||EPOCH_ISO)){
@@ -941,10 +990,18 @@ function mergeRemoteIntoLocal(remote){
 function doPushToCloud(){
   const url = getGasUrl();
   if(!url){ cloudPushInFlight = false; cloudPushPending = false; return; } // 極端情況：push送到一半網址被清空，也要記得解除旗標，不然背景同步會永遠卡住
+  const versionBeforeThisCall = localChangeVersion;
   pushOnce_().then(success=>{
     setSyncStatus(success ? 'synced' : 'error');
     if(success){
-      try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){} // 這次送出的就是目前最新的db，確定送達雲端了才清掉標記
+      // 只有「送出去之後，版本號都沒再變過」才代表現在雲端拿到的就是本機最新狀態，
+      // 才能清掉旗標。如果這段期間又有別的異動插進來（不管是不是同一個地方），
+      // 旗標要繼續留著，而且要再補送一次，不然新的那筆異動會變成「沒人知道還沒送出」。
+      if(localChangeVersion === versionBeforeThisCall){
+        try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+      } else {
+        queueCloudSync(); // 還有更新的異動沒送到，馬上排一次補送
+      }
       // 雲端合併回來的最終結果（帳號/品項/供應商/訂單/設定）畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
       if(currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
     }
@@ -977,6 +1034,7 @@ function pullFromCloud(showMsg){
         normalizeDbShape(); // 雲端資料可能是還沒升級過的舊格式，缺deletedItemIds等新欄位的話下面migrate系列會直接壞掉，這裡先補齊
         sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 雲端資料可能是舊裝置整包蓋上去、沒排序過的，這裡重新排序，避免「最近幾筆」的畫面顯示錯亂
         sortByTimeFieldDesc(db.priceLog, 'timeISO');
+        sortByTimeFieldDesc(db.actionLog, 'time');
         saveDBLocalOnly();
         if(hasPendingLocalChanges) queueCloudSync(); // 合併完本機還有異動沒送出去，馬上補送一次，確定真的到雲端
         // 雲端拉回來的資料可能是別的裝置還沒跑過修正的舊格式（例如舊版供應商
@@ -1064,6 +1122,7 @@ function normalizeDbShape(){
   if(!Array.isArray(db.items)) db.items = [];
   if(!Array.isArray(db.orders)) db.orders = [];
   if(!Array.isArray(db.priceLog)) db.priceLog = [];
+  if(!Array.isArray(db.actionLog)) db.actionLog = []; // 2026-10-01新增：統一操作紀錄（誰、什麼時候、做了什麼），同步到後台試算表的「操作紀錄」分頁
   if(!db.cart || typeof db.cart!=='object') db.cart = {};
   if(!db.cartUpdatedAt) db.cartUpdatedAt = EPOCH_ISO;
   if(!db.lastOrderBySupplier || typeof db.lastOrderBySupplier!=='object') db.lastOrderBySupplier = {};
@@ -1071,6 +1130,7 @@ function normalizeDbShape(){
   // 多裝置合併同步要用的時間戳記／墓碑清單／唯一id，舊資料沒有的話在這裡補齊
   if(!Array.isArray(db.deletedItemIds)) db.deletedItemIds = [];
   if(!Array.isArray(db.deletedSupplierIds)) db.deletedSupplierIds = [];
+  if(!Array.isArray(db.deletedOrderIds)) db.deletedOrderIds = []; // 2026-10-01新增：刪除訂單的墓碑清單，同步時判斷「是不是已經被刪除」用
   db.items.forEach(it=>{ if(!it.updatedAt) it.updatedAt = EPOCH_ISO; });
   // 品項顯示順序改用sortIndex欄位排序（不再依賴陣列本身的排列順序，多裝置合併同步
   // 才不會把手動排好的順序弄亂）。舊資料沒有sortIndex的話，照目前陣列裡的順序
@@ -1480,6 +1540,7 @@ function addSupplier(){
   if(db.suppliers.some(s=>s.name===name)){ showToast('已經有一家同名的供應商了'); return; }
   db.suppliers.push({id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0, updatedAt:nowISO()});
   input.value='';
+  logAction('新增供應商', name, '');
   saveDB(); renderSupplierList(); renderAdmin();
   showToast('已新增供應商');
 }
@@ -1612,6 +1673,10 @@ function addItem(){
   db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:state.currentSupplierId, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(state.currentSupplierId)});
   document.getElementById('newItemName').value='';
   document.getElementById('newItemPrice').value='';
+  {
+    const s = db.suppliers.find(x=>x.id===state.currentSupplierId);
+    logAction('新增品項', s?s.name:'', `${name} / $${price}`);
+  }
   saveDB(); renderItemList();
   showToast('已新增品項');
 }
@@ -1625,11 +1690,16 @@ function addItemFromManage(){
   db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:sid, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(sid)});
   document.getElementById('itemManageNewName').value='';
   document.getElementById('itemManageNewPrice').value='';
+  {
+    const s = db.suppliers.find(x=>x.id===sid);
+    logAction('新增品項', s?s.name:'', `${name} / $${price}`);
+  }
   saveDB(); renderItemManage(); renderItemList();
   showToast('已新增品項');
 }
 function deleteItem(itemId){
   if(!isStoreAdmin()) return;
+  const deletedItem = db.items.find(i=>i.id===itemId);
   db.items = db.items.filter(i=>i.id!==itemId);
   db.deletedItemIds.push({id:itemId, deletedAt:nowISO()}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   for(const sid in db.cart){
@@ -1637,6 +1707,10 @@ function deleteItem(itemId){
     if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
   }
   db.cartUpdatedAt = nowISO();
+  if(deletedItem){
+    const s = db.suppliers.find(x=>x.id===deletedItem.supplierId);
+    logAction('刪除品項', s?s.name:'', deletedItem.name);
+  }
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList(); renderAdmin();
   showToast('已刪除品項');
 }
@@ -1763,6 +1837,7 @@ async function confirmCheckout(){
     s.freq = (s.freq||0)+1;
     s.updatedAt = nowISO();
     newOrders.push(order);
+    logAction('下單', s.name, `${order.id} / ${items.map(it=>it.name+' x'+it.qty).join('、')}`);
   }
   if(newOrders.length===0) return; // 購物車裡的品項/供應商全部被刪除過，沒有任何有效訂單可以送出
   db.cart = {};
@@ -1797,12 +1872,19 @@ async function attemptCheckoutPush_(){
   showCheckoutSubmittingState_(true);
   saveDBLocalOnly(); // 先確定寫進本機，不管接下來雲端送不送得出去，這筆都不會不見
   try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
+  localChangeVersion++; // 這幾張新訂單算一次「本機變了」，版本號跟著走
 
   // 不要跟背景那套debounce排程搶著打雲端，先清掉排程、等正在跑的背景push（如果有）結束，
   // 自己來做這一次「送出並確認」。
   clearTimeout(cloudSyncTimer); cloudSyncTimer = null;
   let waited = 0;
   while(cloudPushInFlight && waited < 10000){ await new Promise(r=>setTimeout(r, 200)); waited += 200; }
+  // 全面體檢時多補的一處：剛剛等待期間，那個「更早的背景push」如果成功了，它自己
+  // 的doPushToCloud()成功回呼會把PENDING_SYNC_KEY清掉（它認為「目前沒有異動還沒送出」，
+  // 但其實這張訂單是在它送出「之後」才加進來的，還沒被它送到）。這裡重新補標記一次，
+  // 確保接下來這次「真正要送這張訂單」的push開始之前，旗標一定正確反映「還有東西
+  // 沒確認送達」，不會因為上一個不相關的背景push剛好同時結束而被誤清掉。
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
   cloudPushInFlight = true;
   setSyncStatus('syncing');
   const ok = await pushOnce_();
@@ -1811,9 +1893,32 @@ async function attemptCheckoutPush_(){
 
   showCheckoutSubmittingState_(false);
 
-  if(ok){
+  // 多一層保險：不能只信任後端回的ok旗標，也不能看push完之後的db.orders——
+  // 因為db現在是跟伺服器回應「合併」、不是整包蓋掉（2026-10-01修正過的race
+  // condition，見pushOnce_內部），本機早就知道自己剛加的訂單，合併完db.orders
+  // 一定找得到它，這樣驗證不出「伺服器那邊是不是真的也收到、存進去了」。
+  // 真正要驗證的是lastPushRemoteData——這是伺服器這次回應裡原始的合併結果，
+  // 如果伺服器真的收到並存檔成功，這裡面一定會有剛剛送出的這幾張訂單；
+  // 如果走到舊版相容路徑（legacyGetMergePost_，伺服器沒有回data欄位），就沒有
+  // 這份原始回應可以驗證，退回用db.orders判斷（此時db.orders已經是確定送出
+  // 之後、跟雲端合併過的結果，仍然是合理的次佳驗證）。
+  const reallyConfirmed = ok && (
+    lastPushRemoteData
+      ? newOrders.every(o => lastPushRemoteData.orders.some(x => x.id === o.id))
+      : newOrders.every(o => db.orders.some(x => x.id === o.id))
+  );
+
+  if(reallyConfirmed){
     setSyncStatus('synced');
-    try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+    // 跟doPushToCloud()同一套版本號判斷：訂單本身確定送達了（上面reallyConfirmed已經
+    // 驗證過），但如果送出去、等回應這段期間（2-6秒）使用者又手動改了別的地方
+    // （例如同時間管理員在改品項），版本號會不一樣，代表還有「這張訂單以外」的
+    // 異動沒送到，旗標不能清、要再補送一次，不能因為訂單本身成功就以為全部都到齊了。
+    if(localChangeVersion === versionAtLastPushStart){
+      try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+    } else {
+      queueCloudSync();
+    }
     window.__pendingCheckoutOrders = null;
     if(currentAccount) renderAll(); // 雲端合併回來的最終結果套用到畫面
     openShareModal(newOrders);
@@ -1993,6 +2098,7 @@ function openReceiveDetail(orderId){
     ${(o.status==='sent' && !isReadonly())?`<button class="icon-btn" style="width:100%;margin-top:10px;" onclick="openAddItemsToOrder('${orderId}')">➕ 這張單還沒收貨，臨時追加品項</button>`:''}
     ${!isReadonly()?`<button class="all-ok-btn" onclick="allOkReceive('${orderId}')">✓ 全部到齊、金額無誤，一鍵確認</button>
     <button class="confirm-recv-btn" onclick="confirmReceive('${orderId}')">確認收貨並封存</button>`:''}
+    ${isStoreAdmin()?`<button class="icon-btn" style="width:100%;margin-top:10px;color:var(--warn);" onclick="deleteOrder('${orderId}')">🗑 刪除這張訂單（測試單／誤建單用，無法復原）</button>`:''}
     <div style="text-align:center;margin-top:10px;"><span onclick="renderReceive()" style="font-size:12px;color:var(--gray);">‹ 返回列表</span></div>
   </div>`;
 }
@@ -2134,6 +2240,13 @@ function confirmReceive(orderId){
   o.status='done';
   o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
   o.updatedAt = nowISO();
+  {
+    const hasDiff = received.some(r=>r.diff);
+    const summary = hasDiff
+      ? `有差異：${received.filter(r=>r.diff).map(r=>`${r.name}（訂${r.orderedQty}/收${r.actualQty}）`).join('、')}`
+      : '全部到齊、金額無誤';
+    logAction('收貨確認', o.supplierName, `${o.id} / ${summary}`);
+  }
   saveDB(); renderReceive();
   showToast('已完成收貨確認');
 }
@@ -2380,6 +2493,7 @@ function renderItemManage(){
 function deleteSupplier(id){
   if(!isStoreAdmin()) return;
   const deletedAt = nowISO();
+  const deletedSupplier = db.suppliers.find(s=>s.id===id);
   db.suppliers = db.suppliers.filter(s=>s.id!==id);
   db.deletedSupplierIds.push({id, deletedAt}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   const removedItemIds = db.items.filter(i=>i.supplierId===id).map(i=>i.id);
@@ -2387,8 +2501,26 @@ function deleteSupplier(id){
   removedItemIds.forEach(itemId=>{ db.deletedItemIds.push({id:itemId, deletedAt}); }); // 供應商底下的品項也一併記錄刪除，不然合併時會被復活
   delete db.cart[id];
   db.cartUpdatedAt = nowISO();
+  if(deletedSupplier) logAction('刪除供應商', deletedSupplier.name, `連同${removedItemIds.length}個品項一併刪除`);
   saveDB(); renderAdmin(); renderSupplierList();
   showToast('已刪除供應商');
+}
+// 2026-10-01新增：管理員刪除訂單（用於清掉測試單、誤建單等情境）。
+// 限制只有維護專員／管理者能刪，刪除前跳出確認視窗避免手滑誤刪。
+// 用墓碑機制（deletedOrderIds）記錄，確保多裝置同步時不會被舊裝置的資料復活，
+// 刪除動作本身也會記進操作紀錄（db.actionLog），存到後台試算表留痕可追溯。
+function deleteOrder(orderId){
+  if(!isStoreAdmin()){ showToast('只有維護專員／管理者能刪除訂單'); return; }
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  const statusLabel = o.status==='done' ? '已完成收貨' : '尚未收貨';
+  const ok = window.confirm(`確定要刪除這張訂單嗎？此動作無法復原。\n\n訂單編號：${o.id}\n供應商：${o.supplierName}\n狀態：${statusLabel}`);
+  if(!ok) return;
+  db.orders = db.orders.filter(x=>x.id!==orderId);
+  db.deletedOrderIds.push({id:orderId, deletedAt:nowISO()});
+  logAction('刪除訂單', o.supplierName, `訂單編號：${o.id}（${statusLabel}）`);
+  saveDB(); renderReceive();
+  showToast('已刪除訂單');
 }
 
 /* ---------- 匯入完整供應商名單（客戶提供的彙整檔） ---------- */
