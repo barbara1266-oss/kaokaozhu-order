@@ -296,6 +296,8 @@ body.readonly .readonly-badge{display:inline-block;}
   </div>
   <div class="grand-total">總計 NTD <span id="grandTotal">0</span></div>
   <button class="confirm-btn" onclick="confirmCheckout()">確認送出並產生LINE清單</button>
+  <div id="checkoutSubmitting" style="display:none;text-align:center;padding:14px;color:#8a7a5c;font-size:14px;">⏳ 送出中，確認雲端收到後才會顯示完成，請稍候…</div>
+  <button id="checkoutRetryBtn" class="confirm-btn" style="display:none;background:#c0392b;" onclick="retryCheckoutPush()">⚠️ 雲端尚未確認收到，點此重新送出</button>
 </section>
 
 <!-- ============ 頁面4：收貨對帳 ============ -->
@@ -826,24 +828,61 @@ function pushToCloud(){
   if(cloudPushInFlight){ cloudPushPending = true; return; } // 上一次還沒送完，先排隊，等它結束後自動補一次
   cloudPushInFlight = true;
   setSyncStatus('syncing');
-  // 重大防呆：之前發生過「這台裝置打開頁面比較久，本機資料是舊的，
-  // 一儲存就把雲端上其他裝置剛新增/修改的資料整批洗掉」的事故。原因是push是
-  // 整包資料直接覆蓋雲端，沒有先看雲端現況。這裡改成push前先偷看一次
-  // 雲端目前的資料，跟本機資料做合併：
-  // - 帳號：只加不減（雲端有、本機沒有的帳號，補回本機再送出）。
-  // - 品項／供應商：用id比對＋異動時間戳記＋刪除墓碑，兩邊都有改過的話留比較新的，
-  //   任一邊刪除過的話（除非之後又被改過）維持刪除，不會復活。
-  // - 訂單／單價異動紀錄：只會新增或更新，用id比對＋異動時間戳記合併，兩邊都留著。
-  // - 系統設定：整包比較updatedAt，誰比較新就用誰的。
-  fetch(url).then(r=>r.json()).then(res=>{
-    try{
-      if(res && res.ok && res.data){
-        const remote = JSON.parse(res.data);
-        mergeRemoteIntoLocal(remote);
-      }
-    }catch(e){ /* 雲端現況讀不到或格式異常，不影響原本要送出的本機資料 */ }
-    doPushToCloud();
-  }).catch(()=>{ doPushToCloud(); }); // 讀取雲端現況失敗（例如離線）也不要卡住，照常送出本機資料
+  doPushToCloud();
+}
+// 2026-10-01新增：後端GAS改版後，合併邏輯搬到雲端做（讀現況→合併→寫回→直接把合併完
+// 的最終結果回傳），前端只要POST一次就好，不用再自己先GET偷看一次雲端現況、自己合併、
+// 再POST——少一次來回，速度大概可以快一半（原本GET+POST兩趟要5秒多，現在一趟POST）。
+// 這個函式是「單純送一次」的最小單位，回傳Promise<boolean>：
+//   true＝確定送達雲端，而且本機db已經套用雲端合併完的最終結果
+//   false＝沒送成功（網路問題、雲端忙線中等），本機db維持原樣不變，呼叫端要自己決定要不要重試
+// 下單結帳（confirmCheckout）會直接await這個函式，等到true才會顯示「完成」、才能分享LINE。
+async function pushOnce_(){
+  const url = getGasUrl();
+  if(!url) return false;
+  try{
+    const r = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // 避免觸發CORS預檢，GAS不支援OPTIONS
+      body: JSON.stringify(db),
+    });
+    const res = await r.json();
+    if(!res || !res.ok) return false;
+    if(res.data){
+      // 新版後端：雲端那邊已經把「本機送來的資料」跟「雲端原本的資料」合併好了，
+      // 直接套用這個最終結果就好，不用前端自己再合併一次。
+      db = JSON.parse(res.data);
+      normalizeDbShape();
+      sortByTimeFieldDesc(db.orders, 'createdAtISO');
+      sortByTimeFieldDesc(db.priceLog, 'timeISO');
+      saveDBLocalOnly();
+      return true;
+    }
+    // 相容舊版後端（還沒更新GAS程式碼、回應沒有data欄位）：退回舊式兩段式做法，
+    // 確保前後端其中一邊還沒更新完成的過渡期間不會壞掉。
+    return await legacyGetMergePost_();
+  }catch(e){
+    return false; // 網路問題、逾時等，呼叫端自行決定要不要重試
+  }
+}
+// 舊版相容：GET偷看雲端現況→前端合併→再POST送出（跟2026-10-01之前的pushToCloud邏輯相同）
+async function legacyGetMergePost_(){
+  const url = getGasUrl();
+  try{
+    const r = await fetch(url);
+    const res = await r.json();
+    if(res && res.ok && res.data){
+      const remote = JSON.parse(res.data);
+      mergeRemoteIntoLocal(remote);
+    }
+  }catch(e){ /* 雲端現況讀不到或格式異常，不影響原本要送出的本機資料 */ }
+  try{
+    const r2 = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(db),
+    });
+    const res2 = await r2.json();
+    return !!(res2 && res2.ok);
+  }catch(e){ return false; }
 }
 // 2026-10-01 修正：這一段原本分別寫在pushToCloud()（push前偷看雲端合併）跟
 // pullFromCloud()（直接db=remote整包蓋掉）兩個地方，邏輯不一致。事故成因：
@@ -902,19 +941,14 @@ function mergeRemoteIntoLocal(remote){
 function doPushToCloud(){
   const url = getGasUrl();
   if(!url){ cloudPushInFlight = false; cloudPushPending = false; return; } // 極端情況：push送到一半網址被清空，也要記得解除旗標，不然背景同步會永遠卡住
-  fetch(url, {
-    method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'}, // 避免觸發CORS預檢，GAS不支援OPTIONS
-    body: JSON.stringify(db),
-  }).then(r=>r.json()).then(res=>{
-    setSyncStatus(res && res.ok ? 'synced' : 'error');
-    if(res && res.ok){
+  pushOnce_().then(success=>{
+    setSyncStatus(success ? 'synced' : 'error');
+    if(success){
       try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){} // 這次送出的就是目前最新的db，確定送達雲端了才清掉標記
+      // 雲端合併回來的最終結果（帳號/品項/供應商/訂單/設定）畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
+      if(currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
     }
-    // 如果剛剛push前偷偷合併回了帳號/品項/供應商/訂單/設定，畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
-    if(res && res.ok && currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
-  }).catch(()=>{ setSyncStatus('error'); })
-  .finally(()=>{
+  }).finally(()=>{
     cloudPushInFlight = false; // 不管成功失敗，這次push都結束了，背景定期同步可以恢復
     if(cloudPushPending){ cloudPushPending = false; pushToCloud(); } // 排隊中還有新變更，馬上補送一次
   });
@@ -1696,7 +1730,13 @@ function renderCheckout(){
   }
 }
 
-function confirmCheckout(){
+// 2026-10-01改版原因：原本下單是「本機先產生單號、馬上顯示可以分享LINE，雲端同步
+// 另外在背景默默做」——結果就是品饌那張單的事故：單號跟LINE分享訊息都出來了，
+// 但雲端其實根本沒收到，員工/客人完全看不出來。
+// 改成：單號產生、購物車清空（這兩步是本機動作，一定成功）之後，不會馬上開分享視窗，
+// 而是先實際送一次雲端、「等雲端真的確認收到」才顯示完成畫面、才能分享LINE。
+// 送出失敗的話，訂單還是安全存在本機（不會不見），畫面改顯示「重新送出」讓使用者自己重試。
+async function confirmCheckout(){
   if(cartSuppliersCount()===0) return;
   const date = document.getElementById('deliveryDate').value;
   const note = document.getElementById('orderNote').value.trim();
@@ -1724,14 +1764,66 @@ function confirmCheckout(){
     s.updatedAt = nowISO();
     newOrders.push(order);
   }
+  if(newOrders.length===0) return; // 購物車裡的品項/供應商全部被刪除過，沒有任何有效訂單可以送出
   db.cart = {};
   db.cartUpdatedAt = nowISO();
-  saveDB();
-  openShareModal(newOrders);
   document.getElementById('orderNote').value='';
   renderSupplierList();
   updateCheckoutBar();
+
+  window.__pendingCheckoutOrders = newOrders; // 記著這批訂單，萬一送不出去，「重新送出」按鈕要用同一批、不是重新結帳
+  await attemptCheckoutPush_();
 }
+function showCheckoutSubmittingState_(show){
+  const spinner = document.getElementById('checkoutSubmitting');
+  const btn = document.querySelector('.confirm-btn');
+  if(spinner) spinner.style.display = show ? '' : 'none';
+  if(btn) btn.style.display = show ? 'none' : '';
+}
+async function attemptCheckoutPush_(){
+  const newOrders = window.__pendingCheckoutOrders;
+  if(!newOrders) return;
+  const retryBtn = document.getElementById('checkoutRetryBtn');
+  if(retryBtn) retryBtn.style.display = 'none';
+
+  if(!getGasUrl()){
+    // 沒設定雲端網址＝刻意單機模式，沒有雲端可以等確認，維持原本「存本機就算完成」的行為
+    saveDB();
+    window.__pendingCheckoutOrders = null;
+    openShareModal(newOrders);
+    return;
+  }
+
+  showCheckoutSubmittingState_(true);
+  saveDBLocalOnly(); // 先確定寫進本機，不管接下來雲端送不送得出去，這筆都不會不見
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
+
+  // 不要跟背景那套debounce排程搶著打雲端，先清掉排程、等正在跑的背景push（如果有）結束，
+  // 自己來做這一次「送出並確認」。
+  clearTimeout(cloudSyncTimer); cloudSyncTimer = null;
+  let waited = 0;
+  while(cloudPushInFlight && waited < 10000){ await new Promise(r=>setTimeout(r, 200)); waited += 200; }
+  cloudPushInFlight = true;
+  setSyncStatus('syncing');
+  const ok = await pushOnce_();
+  cloudPushInFlight = false;
+  if(cloudPushPending){ cloudPushPending = false; pushToCloud(); }
+
+  showCheckoutSubmittingState_(false);
+
+  if(ok){
+    setSyncStatus('synced');
+    try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+    window.__pendingCheckoutOrders = null;
+    if(currentAccount) renderAll(); // 雲端合併回來的最終結果套用到畫面
+    openShareModal(newOrders);
+  } else {
+    setSyncStatus('error');
+    if(retryBtn) retryBtn.style.display = '';
+    showToast('訂單已經安全存在本機，但還沒確認送達雲端，請點「重新送出」再試一次');
+  }
+}
+function retryCheckoutPush(){ return attemptCheckoutPush_(); }
 
 /* ---------- LINE分享文字 ---------- */
 function buildLineText(order){
