@@ -2623,6 +2623,30 @@ setInterval(()=>{
   if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')) return; // 使用者正在輸入，先不要打斷
   pullFromCloud(false);
 }, 3*60*1000);
+
+/* ---------- 離開頁面防呆 ---------- */
+// 2026-10-01新增：Barbara的要求是「客戶端修改後，跟送上雲端這件事，連結度要順暢」——
+// 這份系統目前的架構（品項/供應商/訂單/設定...任何異動都先存本機、雲端同步在背景做）
+// 對「資料不會不見」已經有保護（PENDING_SYNC_KEY機制，下次打開會自動補送），但如果
+// 使用者在送出去之前就主動關掉分頁/重新整理，畫面上原本沒有明確警告。
+// 這裡加一個瀏覽器原生的「確定要離開嗎」提示：只要還有本機異動還沒確認送達雲端
+// （PENDING_SYNC_KEY還在），使用者想關閉分頁/重新整理/跳轉到別的網址，瀏覽器會
+// 跳出標準警告視窗，要使用者自己確認才能真的離開——這就是「上傳確認後才能確定
+// 離開頁面」的具體做法。
+// 誠實的限制：手機瀏覽器「切到別的App」（例如切去LINE分享）不一定會觸發這個事件
+// （這是手機作業系統的行為，網頁程式無法強制攔截），所以這個提示補的是「使用者
+// 自己主動關閉/切換網址」這種情況；「切到別的App」那種情況，資料安全是靠
+// PENDING_SYNC_KEY機制本身保護（下次打開會自動偵測、合併、補送，不會不見），
+// 兩者合起來才是完整的保護，不是互相替代。
+window.addEventListener('beforeunload', function(e){
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(err){}
+  if(hasPending){
+    e.preventDefault();
+    e.returnValue = '還有異動尚未確認送達雲端，確定要離開嗎？';
+    return e.returnValue;
+  }
+});
 </script>
 </body>
 </html>
