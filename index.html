@@ -1831,6 +1831,9 @@ async function confirmCheckout(){
       status:'sent', createdAt:new Date().toLocaleString('zh-TW',{hour12:false}),
       createdAtISO, updatedAt:createdAtISO,
       received:null,
+      // 2026-10-01新增：記下單人帳號，讓「下單記錄」「收貨對帳」這些後台報表
+      // 也能直接看到「誰下的單」，不用另外去翻操作紀錄分頁對照。
+      createdByAccount: currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入',
     };
     db.orders.unshift(order);
     db.lastOrderBySupplier[sid] = {...db.cart[sid]};
@@ -2240,6 +2243,8 @@ function confirmReceive(orderId){
   o.status='done';
   o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
   o.updatedAt = nowISO();
+  // 2026-10-01新增：記收貨確認人帳號，理由同下單人——後台報表要直接看得到「誰收的貨」。
+  o.receivedByAccount = currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入';
   {
     const hasDiff = received.some(r=>r.diff);
     const summary = hasDiff
