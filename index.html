@@ -223,6 +223,45 @@ body.readonly .readonly-badge{display:inline-block;}
 .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:5px;}
 .sync-dot.off{background:var(--warn);}
 .sync-line{font-size:13px;color:var(--gray);text-align:center;margin:8px 0 14px;}
+/* 2026-10-02新增：未同步強制警示列——原本只有小小一顆燈號+文字，手機上太容易被忽略，
+   導致訂單送出失敗、卡在本機一整晚都沒人發現（品饌/裕賀等5張單事故）。改成整條醒目的
+   紅色固定banner，只要PENDING_SYNC_KEY還在，不管切到哪一頁都看得到，而且用
+   position:sticky貼在最上面，不會被捲動捲走看不見。 */
+.pending-sync-banner{display:none;position:sticky;top:0;z-index:250;background:#d32f2f;color:#fff;
+  font-size:14px;font-weight:700;text-align:center;padding:10px 14px;line-height:1.5;}
+.pending-sync-banner.show{display:block;}
+.pending-sync-banner button{margin-left:8px;background:#fff;color:#d32f2f;border:none;border-radius:6px;
+  padding:6px 12px;font-size:13px;font-weight:700;}
+
+/* 2026-10-02新增：成功同步提示——之前只有失敗才有醒目紅色banner，成功只有
+   一行小字「資料已存於本機」，容易被忽略，造成「沒跳紅色=應該沒事」的消極
+   判斷方式。現在送達雲端成功後，跳一個同樣醒目、但綠色、會自動消失的提示，
+   讓使用者「確實看到」成功，不是用沉默去推論。 */
+.sync-success-banner{position:sticky;top:0;z-index:249;background:#3E7D4C;color:#fff;
+  font-size:14px;font-weight:700;text-align:center;padding:10px 14px;line-height:1.5;
+  max-height:0;overflow:hidden;opacity:0;transition:max-height .25s ease,opacity .25s ease,padding .25s ease;}
+.sync-success-banner.show{max-height:60px;opacity:1;padding:10px 14px;}
+
+/* 2026-10-02新增：管理頁改用可收合區塊（details/summary），原本雲端設定／備份／
+   授權／系統設定／帳號／供應商／品項／單價紀錄全部攤平在同一條無限捲動的頁面裡，
+   重要但少用的設定（網址、備份還原、授權）跟每天都會用的（品項、帳號、供應商）
+   混在一起，捲動時容易捲過重要設定、也很難一眼找到要改的地方。拆成分區塊收合：
+   日常操作類別預設展開，風險較高、不常動的系統設定類別預設收合，降低手滑誤觸、
+   也讓畫面一眼看出「現在要找的東西在哪一類」。用原生details/summary，不需要
+   額外寫開合邏輯，手機上原生支援良好。 */
+.admin-group{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;
+  overflow:hidden;background:var(--card);}
+.admin-group summary{list-style:none;cursor:pointer;padding:16px;font-size:17px;font-weight:700;
+  color:var(--charcoal);display:flex;align-items:center;justify-content:space-between;
+  background:var(--gray-bg);}
+.admin-group summary::-webkit-details-marker{display:none;}
+.admin-group summary .grp-cnt{font-size:13px;font-weight:500;color:var(--gray);margin-left:8px;}
+.admin-group summary .grp-chev{transition:transform .2s;color:var(--gray);font-size:14px;}
+.admin-group[open] summary .grp-chev{transform:rotate(90deg);}
+.admin-group summary .grp-icon{margin-right:6px;}
+.admin-group .admin-group-body{padding:14px;}
+.admin-group.risk summary{background:#FBEFDC;}
+.admin-group.risk summary .grp-label{color:var(--brand-dark);}
 </style>
 </head>
 <body>
@@ -239,6 +278,11 @@ body.readonly .readonly-badge{display:inline-block;}
   </div>
 </div>
 
+<div class="pending-sync-banner" id="pendingSyncBanner">
+  ⚠️ 有資料尚未確認送達雲端，請勿關閉App，正在自動重試…
+  <button onclick="manualRetrySync()">立即重試</button>
+</div>
+<div class="sync-success-banner" id="syncSuccessBanner"></div>
 <div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span></div>
 
 <!-- ============ 登入畫面 ============ -->
@@ -333,78 +377,98 @@ body.readonly .readonly-badge{display:inline-block;}
 
 <!-- ============ 頁面6：供應商管理／紀錄 ============ -->
 <section class="page" id="page-admin">
-  <div class="page-title">雲端同步設定 <span class="cnt">僅維護專員可設定</span></div>
-  <div class="card" id="cloudSyncCard"></div>
 
-  <div class="page-title">資料備份／還原 <span class="cnt">僅維護專員可操作</span></div>
-  <div class="card" id="backupCard"></div>
+  <!-- 2026-10-02重整：原本8個區塊攤平成一條無限捲動的頁面，現在分成3個可收合
+       群組——「系統設定與安全」風險較高、不常動，預設收合；「人員與供應商」「商品
+       管理」是日常操作，預設展開。所有原本的id／render函式完全沒有變動，只是外面
+       多包一層details，不影響任何現有邏輯。 -->
+  <details class="admin-group risk" id="adminGroupSystem">
+    <summary><span><span class="grp-icon">⚙️</span><span class="grp-label">系統設定與安全</span><span class="grp-cnt">雲端網址・備份還原・授權・外觀，僅維護專員</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">雲端同步設定 <span class="cnt">僅維護專員可設定</span></div>
+      <div class="card" id="cloudSyncCard"></div>
 
-  <div class="page-title">系統授權管理</div>
-  <div class="card" id="licensePanel"></div>
+      <div class="page-title">資料備份／還原 <span class="cnt">僅維護專員可操作</span></div>
+      <div class="card" id="backupCard"></div>
 
-  <div class="page-title">系統設定 <span class="cnt">僅最高權限可修改</span></div>
-  <div class="card" id="settingsCard">
-    <div class="field-row">
-      <label>店名（顯示在頂部標題）</label>
-      <input type="text" id="settingShopName" placeholder="例如：燒酒烤烤豬">
-    </div>
-    <div class="field-row">
-      <label>副標題</label>
-      <input type="text" id="settingAppSub" placeholder="例如：叫貨系統">
-    </div>
-    <div class="field-row">
-      <label>分頁圖示（Icon／Logo，方便開多個分頁時辨識）</label>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <img id="faviconPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
-        <input type="file" id="faviconUpload" accept="image/*" onchange="onFaviconUpload(event)">
+      <div class="page-title">系統授權管理</div>
+      <div class="card" id="licensePanel"></div>
+
+      <div class="page-title">系統設定 <span class="cnt">僅最高權限可修改</span></div>
+      <div class="card" id="settingsCard">
+        <div class="field-row">
+          <label>店名（顯示在頂部標題）</label>
+          <input type="text" id="settingShopName" placeholder="例如：燒酒烤烤豬">
+        </div>
+        <div class="field-row">
+          <label>副標題</label>
+          <input type="text" id="settingAppSub" placeholder="例如：叫貨系統">
+        </div>
+        <div class="field-row">
+          <label>分頁圖示（Icon／Logo，方便開多個分頁時辨識）</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="faviconPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
+            <input type="file" id="faviconUpload" accept="image/*" onchange="onFaviconUpload(event)">
+          </div>
+        </div>
+        <div class="field-row" id="bgPatternRow">
+          <label>整體背景圖案 <span style="color:var(--brand);font-weight:700;">（僅「維護專員」可設定）</span></label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="bgPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
+            <input type="file" id="bgUpload" accept="image/*" onchange="onBgUpload(event)">
+            <button class="icon-btn" onclick="resetBg()" type="button">還原預設</button>
+          </div>
+        </div>
+        <button class="icon-btn" style="width:100%;" onclick="saveSettings()">儲存設定</button>
       </div>
     </div>
-    <div class="field-row" id="bgPatternRow">
-      <label>整體背景圖案 <span style="color:var(--brand);font-weight:700;">（僅「維護專員」可設定）</span></label>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <img id="bgPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
-        <input type="file" id="bgUpload" accept="image/*" onchange="onBgUpload(event)">
-        <button class="icon-btn" onclick="resetBg()" type="button">還原預設</button>
+  </details>
+
+  <details class="admin-group" id="adminGroupPeople" open>
+    <summary><span><span class="grp-icon">👥</span><span class="grp-label">人員與供應商</span><span class="grp-cnt">帳號、供應商清單</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">帳號管理 <span class="cnt">僅維護專員可操作</span></div>
+      <div class="card" id="accountManageList"></div>
+      <div class="card" id="accountAddForm" style="display:none;">
+        <div class="field-row"><label>帳號</label><input type="text" id="newAccAccount" placeholder="例如：manager01" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+        <div class="field-row"><label>密碼（建議4-6位數字）</label><input type="text" id="newAccPassword" placeholder="例如：1234"></div>
+        <div class="field-row"><label>姓名</label><input type="text" id="newAccName" placeholder="例如：陳店長"></div>
+        <div class="field-row"><label>角色</label>
+          <select id="newAccRole"></select>
+        </div>
+        <button class="icon-btn" style="width:100%;" onclick="addAccount()">＋新增帳號</button>
       </div>
+
+      <div class="page-title" style="margin-top:18px;">供應商管理</div>
+      <div class="card" id="importCard" style="display:none;">
+        <div style="font-size:13px;margin-bottom:8px;">客戶提供的完整供應商名單（23家、249項品項）已內建在系統裡，按下方按鈕一次匯入。已存在的供應商/品項不會重複新增，可以放心多按幾次。</div>
+        <button class="icon-btn" style="width:100%;" onclick="importFullSupplierList()">📥 一鍵匯入完整供應商名單</button>
+      </div>
+      <div class="card" id="adminSupplierList"></div>
     </div>
-    <button class="icon-btn" style="width:100%;" onclick="saveSettings()">儲存設定</button>
-  </div>
+  </details>
 
-  <div class="page-title" style="margin-top:18px;">帳號管理 <span class="cnt">僅維護專員可操作</span></div>
-  <div class="card" id="accountManageList"></div>
-  <div class="card" id="accountAddForm" style="display:none;">
-    <div class="field-row"><label>帳號</label><input type="text" id="newAccAccount" placeholder="例如：manager01" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
-    <div class="field-row"><label>密碼（建議4-6位數字）</label><input type="text" id="newAccPassword" placeholder="例如：1234"></div>
-    <div class="field-row"><label>姓名</label><input type="text" id="newAccName" placeholder="例如：陳店長"></div>
-    <div class="field-row"><label>角色</label>
-      <select id="newAccRole"></select>
+  <details class="admin-group" id="adminGroupItems" open>
+    <summary><span><span class="grp-icon">📦</span><span class="grp-label">商品管理</span><span class="grp-cnt">品項、單價異動紀錄</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">品項管理 <span class="cnt">可新增、修改單位、排序、刪除</span></div>
+      <div class="card">
+        <div class="field-row" style="margin-bottom:0;">
+          <label>選擇供應商</label>
+          <select id="itemManageSupplierSelect" onchange="renderItemManage()"></select>
+        </div>
+      </div>
+      <div class="add-supplier-row" id="itemManageAddRow">
+        <input type="text" id="itemManageNewName" placeholder="新增品項名稱…">
+        <input type="text" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
+        <button class="icon-btn" onclick="addItemFromManage()">＋新增</button>
+      </div>
+      <div id="itemManageList"></div>
+
+      <div class="page-title" style="margin-top:18px;">單價異動紀錄</div>
+      <div class="card" id="priceLog"></div>
     </div>
-    <button class="icon-btn" style="width:100%;" onclick="addAccount()">＋新增帳號</button>
-  </div>
-
-  <div class="page-title" style="margin-top:18px;">供應商管理</div>
-  <div class="card" id="importCard" style="display:none;">
-    <div style="font-size:13px;margin-bottom:8px;">客戶提供的完整供應商名單（23家、249項品項）已內建在系統裡，按下方按鈕一次匯入。已存在的供應商/品項不會重複新增，可以放心多按幾次。</div>
-    <button class="icon-btn" style="width:100%;" onclick="importFullSupplierList()">📥 一鍵匯入完整供應商名單</button>
-  </div>
-  <div class="card" id="adminSupplierList"></div>
-
-  <div class="page-title" style="margin-top:18px;">品項管理 <span class="cnt">可新增、修改單位、排序、刪除</span></div>
-  <div class="card">
-    <div class="field-row" style="margin-bottom:0;">
-      <label>選擇供應商</label>
-      <select id="itemManageSupplierSelect" onchange="renderItemManage()"></select>
-    </div>
-  </div>
-  <div class="add-supplier-row" id="itemManageAddRow">
-    <input type="text" id="itemManageNewName" placeholder="新增品項名稱…">
-    <input type="text" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
-    <button class="icon-btn" onclick="addItemFromManage()">＋新增</button>
-  </div>
-  <div id="itemManageList"></div>
-
-  <div class="page-title" style="margin-top:18px;">單價異動紀錄</div>
-  <div class="card" id="priceLog"></div>
+  </details>
 </section>
 
 <div class="checkout-bar" id="checkoutBar">
@@ -831,6 +895,40 @@ function setSyncStatus(mode){
   const m = map[mode]||map.local;
   dot.className = 'sync-dot' + (m.cls?' '+m.cls:'');
   text.textContent = m.label;
+  updatePendingSyncBanner_();
+}
+// 2026-10-02新增：統一在這裡判斷「要不要顯示強制警示banner」，只看PENDING_SYNC_KEY
+// 這個唯一的真相來源（跟beforeunload防呆用的是同一個判斷依據），不管是saveDB()、
+// push成功/失敗、背景定期同步...任何地方呼叫setSyncStatus()都會自動更新，不用每個
+// 呼叫點各自記得去開關banner、容易漏掉。
+function updatePendingSyncBanner_(){
+  const banner = document.getElementById('pendingSyncBanner');
+  if(!banner) return;
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  banner.classList.toggle('show', hasPending);
+}
+// 2026-10-02新增：成功同步的正向提示——之前「沒跳紅色=應該沒事」是一種消極、
+// 容易被誤判的判斷方式（今晚的事故正是因為沒有明顯提示讓人發現失敗，但反過來說，
+// 平常「成功」也同樣沒有明顯提示，只能靠「沒看到紅色」去推論，不夠踏實）。
+// 下單送出、收貨確認這兩個「客戶輸入」最關鍵的動作，一律主動顯示；其他背景
+// 自動儲存（改設定、改單價…）只有在「剛剛才從卡住的紅色警示恢復過來」時才顯示，
+// 避免每打一個字都跳一次、反而變成干擾。3秒後自動收合，不用使用者手動關閉。
+let syncSuccessBannerTimer_ = null;
+function showSyncSuccessBanner_(message){
+  const banner = document.getElementById('syncSuccessBanner');
+  if(!banner) return;
+  banner.textContent = '✅ ' + (message || '資料已確認送達雲端');
+  banner.classList.add('show');
+  clearTimeout(syncSuccessBannerTimer_);
+  syncSuccessBannerTimer_ = setTimeout(()=>{ banner.classList.remove('show'); }, 3000);
+}
+// 讓使用者在banner上可以自己手動催一次重試，不用乾等背景同步（最長可能要等到
+// 下次切回分頁或3分鐘定期同步才會自動補送）。
+function manualRetrySync(){
+  if(!getGasUrl()){ return; }
+  showToast('正在重新送出…');
+  pullFromCloud(false); // pullFromCloud內部本來就會判斷hasPendingLocalChanges並自動補送push，邏輯共用不重寫一份
 }
 let cloudPushInFlight = false; // push還沒送完（GET偷看雲端 + POST送出）的這段期間设為true，
                                 // 讓背景定期同步（見檔案最後的setInterval）知道「現在有一次push還沒完成」，
@@ -999,6 +1097,10 @@ function doPushToCloud(){
       // 旗標要繼續留著，而且要再補送一次，不然新的那筆異動會變成「沒人知道還沒送出」。
       if(localChangeVersion === versionBeforeThisCall){
         try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+        updatePendingSyncBanner_(); // 2026-10-02：上面setSyncStatus()已經先跑過一次了，
+                                     // 那時候PENDING_SYNC_KEY還沒清掉，banner會抓到舊狀態，
+                                     // 這裡清掉之後要再手動刷新一次，不然警示會卡著不消失
+        if(currentAccount) showSyncSuccessBanner_(); // 每一筆改動（下單以外，例如收貨確認、改品項、改設定）確實送達雲端都主動告知，不要只靠「沒跳紅色」去推論
       } else {
         queueCloudSync(); // 還有更新的異動沒送到，馬上排一次補送
       }
@@ -1348,7 +1450,30 @@ function applySettings(){
 }
 const MAX_BG_UPLOAD_BYTES = 1.5*1024*1024;   // 背景圖案上限 1.5MB
 const MAX_FAVICON_UPLOAD_BYTES = 300*1024;    // 圖示上限 300KB（本來就只需要小圖示）
-function onBgUpload(evt){
+// 2026-10-02新增：圖片不再直接轉base64塞進db.settings（那樣會讓單一儲存格的
+// 資料庫被撐爆，害所有資料同步一起失敗），改成先上傳到後端的Google雲端硬碟，
+// db.settings裡只存上傳完拿到的網址（短短一串文字，不會佔同步的空間）。
+function uploadImageToDrive_(file){
+  return new Promise((resolve, reject)=>{
+    const url = getGasUrl();
+    if(!url){ reject(new Error('尚未設定雲端網址，無法上傳圖片')); return; }
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const res = await fetch(url, {
+          method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify({ __uploadImage:true, imageDataUrl: reader.result, filename: file.name }),
+        });
+        const json = await res.json();
+        if(json && json.ok && json.url) resolve(json.url);
+        else reject(new Error((json && json.error) || '上傳失敗'));
+      }catch(e){ reject(e); }
+    };
+    reader.onerror = ()=>reject(new Error('圖片讀取失敗'));
+    reader.readAsDataURL(file);
+  });
+}
+async function onBgUpload(evt){
   if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
   const file = evt.target.files[0];
   if(!file) return;
@@ -1357,16 +1482,19 @@ function onBgUpload(evt){
     evt.target.value = '';
     return;
   }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    db.settings.bgPattern = reader.result;
+  showToast('上傳中…');
+  try{
+    const url = await uploadImageToDrive_(file);
+    db.settings.bgPattern = url;
     db.settings.updatedAt = nowISO();
     const prev = document.getElementById('bgPreview');
-    prev.src = reader.result; prev.style.display='inline-block';
+    prev.src = url; prev.style.display='inline-block';
     saveDB(); applySettings();
     showToast('背景圖案已套用');
-  };
-  reader.readAsDataURL(file);
+  }catch(e){
+    showToast('上傳失敗，請稍後再試一次');
+    evt.target.value = '';
+  }
 }
 function resetBg(){
   if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
@@ -1382,7 +1510,7 @@ function fillSettingsForm(){
   const prev = document.getElementById('faviconPreview');
   if(db.settings.favicon){ prev.src = db.settings.favicon; prev.style.display='inline-block'; }
 }
-function onFaviconUpload(evt){
+async function onFaviconUpload(evt){
   if(!isStoreAdmin()) return;
   const file = evt.target.files[0];
   if(!file) return;
@@ -1391,16 +1519,19 @@ function onFaviconUpload(evt){
     evt.target.value = '';
     return;
   }
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    db.settings.favicon = reader.result;
+  showToast('上傳中…');
+  try{
+    const url = await uploadImageToDrive_(file);
+    db.settings.favicon = url;
     db.settings.updatedAt = nowISO();
     const prev = document.getElementById('faviconPreview');
-    prev.src = reader.result; prev.style.display='inline-block';
+    prev.src = url; prev.style.display='inline-block';
     saveDB(); applySettings();
     showToast('圖示已套用');
-  };
-  reader.readAsDataURL(file);
+  }catch(e){
+    showToast('上傳失敗，請稍後再試一次');
+    evt.target.value = '';
+  }
 }
 function saveSettings(){
   if(!isStoreAdmin()){ showToast('只有「管理者」以上身份能修改設定'); return; }
@@ -1435,12 +1566,36 @@ function initLogin(){
     document.getElementById('loginGate').classList.add('show');
   }
 }
+// 2026-10-02新增：密碼改用SHA-256雜湊存放，不再是明文。looksHashed_用來判斷
+// 一個密碼欄位現在存的是不是雜湊值（64個16進位字元）——舊帳號在這次更新之前
+// 都是明文，不會符合這個格式，第一次成功登入時會順便把它升級成雜湊存回去，
+// 不需要手動幫每個帳號重設密碼。
+function looksHashed_(pw){ return typeof pw === 'string' && /^[0-9a-f]{64}$/.test(pw); }
+async function hashPassword_(plain){
+  const data = new TextEncoder().encode(plain);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
 async function doLogin(){
   const account = document.getElementById('loginAccount').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
   // 帳號不分大小寫（手機輸入常常會被自動大寫第一個字），密碼維持區分大小寫
-  const tryMatch = () => db.accounts.find(a=>a.account.toLowerCase()===account.toLowerCase() && a.password===password);
-  let acc = tryMatch();
+  const tryMatch = async () => {
+    const acc = db.accounts.find(a=>a.account.toLowerCase()===account.toLowerCase());
+    if(!acc) return null;
+    if(looksHashed_(acc.password)){
+      return (await hashPassword_(password)) === acc.password ? acc : null;
+    }
+    // 舊帳號還是明文：比對成功的話，順便就地升級成雜湊存起來（並同步到雲端），
+    // 之後這個帳號就不再是明文了，不用額外請Barbara手動重設。
+    if(acc.password === password){
+      acc.password = await hashPassword_(password);
+      saveDB();
+      return acc;
+    }
+    return null;
+  };
+  let acc = await tryMatch();
   if(!acc && getGasUrl()){
     // 帳密對不上時，先別急著判定錯誤：有可能是這台裝置剛好在帳號被新增／
     // 修改「之前」就已經打開頁面，本機記憶體裡還是舊的帳號清單、雲端已經
@@ -1452,7 +1607,7 @@ async function doLogin(){
     // 不要讓使用者被卡在「確認中…」按鈕動不了。
     await Promise.race([ pullFromCloud(false), new Promise(r=>setTimeout(r, 8000)) ]);
     if(btn){ btn.disabled = false; btn.textContent = '登入'; }
-    acc = tryMatch();
+    acc = await tryMatch();
   }
   if(!acc){
     document.getElementById('loginError').style.display='block';
@@ -1700,6 +1855,12 @@ function addItemFromManage(){
 function deleteItem(itemId){
   if(!isStoreAdmin()) return;
   const deletedItem = db.items.find(i=>i.id===itemId);
+  if(!deletedItem) return;
+  // 2026-10-02新增：品項刪除原本是「點了就刪、沒有二次確認」，跟訂單刪除（已有
+  // 二次確認）的安全等級不一致，手機上列表密集很容易手滑點到。補上跟刪除訂單
+  // 同樣規格的確認視窗，說清楚刪了什麼、後果是什麼。
+  const okDel = window.confirm(`確定要刪除這個品項嗎？此動作無法復原。\n\n品項：${deletedItem.name}\n單價：NTD ${deletedItem.price} / ${deletedItem.unit}`);
+  if(!okDel) return;
   db.items = db.items.filter(i=>i.id!==itemId);
   db.deletedItemIds.push({id:itemId, deletedAt:nowISO()}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   for(const sid in db.cart){
@@ -1919,6 +2080,8 @@ async function attemptCheckoutPush_(){
     // 異動沒送到，旗標不能清、要再補送一次，不能因為訂單本身成功就以為全部都到齊了。
     if(localChangeVersion === versionAtLastPushStart){
       try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+      updatePendingSyncBanner_(); // 理由同doPushToCloud()那處：setSyncStatus()已經先跑過，要再刷新一次banner
+      showSyncSuccessBanner_(newOrders.length>1 ? `${newOrders.length}張訂單已確認送達雲端，後台同步完成` : '訂單已確認送達雲端，後台同步完成'); // 這是Barbara最在意的「客戶輸入的每一筆」最關鍵的一刻，一定要主動、明確告知
     } else {
       queueCloudSync();
     }
@@ -2497,8 +2660,14 @@ function renderItemManage(){
 }
 function deleteSupplier(id){
   if(!isStoreAdmin()) return;
-  const deletedAt = nowISO();
   const deletedSupplier = db.suppliers.find(s=>s.id===id);
+  if(!deletedSupplier) return;
+  // 2026-10-02新增：刪供應商原本也是「點了就刪、沒有二次確認」，而且會連同
+  // 底下所有品項一起刪掉——風險比刪單一品項更高，更需要說清楚會影響多少品項。
+  const itemCountUnderSupplier = db.items.filter(i=>i.supplierId===id).length;
+  const okDel = window.confirm(`確定要刪除這家供應商嗎？此動作無法復原。\n\n供應商：${deletedSupplier.name}\n連同底下 ${itemCountUnderSupplier} 個品項會一併刪除`);
+  if(!okDel) return;
+  const deletedAt = nowISO();
   db.suppliers = db.suppliers.filter(s=>s.id!==id);
   db.deletedSupplierIds.push({id, deletedAt}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   const removedItemIds = db.items.filter(i=>i.supplierId===id).map(i=>i.id);
@@ -2570,20 +2739,27 @@ function renderAccountManage(){
   wrap.innerHTML = db.accounts.map(a=>`
     <div class="supplier-manage-item">
       <span>${escapeHtml(a.name)}（${escapeHtml(a.role)}）<br>
-        <span style="color:var(--gray);font-size:12px;">帳號：${escapeHtml(a.account)}／密碼：
-          <span id="pw-${a.id}" style="cursor:pointer;letter-spacing:1px;" onclick="toggleAccountPassword('${a.id}')" title="點一下顯示/隱藏">••••</span>
+        <span style="color:var(--gray);font-size:12px;">帳號：${escapeHtml(a.account)}／密碼：••••
+          <a style="color:var(--brand);cursor:pointer;margin-left:4px;" onclick="resetAccountPassword('${a.id}')">重設</a>
         </span></span>
       <span class="del-x" onclick="deleteAccount('${a.id}')">刪除</span>
     </div>`).join('') || '<div class="empty">尚無帳號</div>';
 }
-function toggleAccountPassword(id){
-  const el = document.getElementById('pw-'+id);
-  if(!el) return;
+// 2026-10-02變更：密碼改成雜湊存放之後，系統本身也沒辦法再「顯示」原密碼是什麼
+// （這是雜湊的本質，不是忘記做，加密過的密碼無法反推回明文）——原本點一下
+// 就能看到密碼的功能，改成「重設」：直接幫這個帳號設一組新密碼。
+async function resetAccountPassword(id){
+  if(!isMaintainer()) return;
   const a = db.accounts.find(x=>x.id===id);
   if(!a) return;
-  el.textContent = el.textContent==='••••' ? a.password : '••••';
+  const newPw = prompt(`幫「${a.name}（${a.account}）」設定新密碼：`);
+  if(!newPw || !newPw.trim()) return;
+  a.password = await hashPassword_(newPw.trim());
+  logAction('重設密碼', a.account, `幫 ${a.name} 重設密碼`);
+  saveDB(); renderAccountManage();
+  showToast('已重設密碼，請告知對方新密碼');
 }
-function addAccount(){
+async function addAccount(){
   if(!isMaintainer()) return;
   const account = document.getElementById('newAccAccount').value.trim();
   const password = document.getElementById('newAccPassword').value.trim();
@@ -2591,7 +2767,8 @@ function addAccount(){
   const role = document.getElementById('newAccRole').value;
   if(!account || !password || !name){ showToast('帳號、密碼、姓名都要填'); return; }
   if(db.accounts.some(a=>a.account.toLowerCase()===account.toLowerCase())){ showToast('這個帳號已經存在了（帳號不分大小寫）'); return; }
-  db.accounts.push({id:'u'+Date.now()+Math.floor(Math.random()*1000), account, password, role, name});
+  const hashed = await hashPassword_(password);
+  db.accounts.push({id:'u'+Date.now()+Math.floor(Math.random()*1000), account, password:hashed, role, name});
   document.getElementById('newAccAccount').value='';
   document.getElementById('newAccPassword').value='';
   document.getElementById('newAccName').value='';
@@ -2734,6 +2911,7 @@ document.addEventListener('focusin', function(e){
 /* ---------- 初始化 ---------- */
 async function initApp(){
   applySettings();
+  updatePendingSyncBanner_(); // App一開啟就先檢查一次：如果上次關閉時還有沒送出去的訂單，立刻顯示警示，不用等第一次setSyncStatus()被呼叫
   if(getGasUrl()){
     await pullFromCloud(false); // 等雲端資料真的到齊，登入驗證才會用到最新帳號清單
   } else {
@@ -2782,6 +2960,19 @@ window.addEventListener('beforeunload', function(e){
     e.preventDefault();
     e.returnValue = '還有異動尚未確認送達雲端，確定要離開嗎？';
     return e.returnValue;
+  }
+});
+// 2026-10-02新增：「切到LINE分享訂單」這個動作本身無法攔截（見上面的誠實限制說明），
+// 但「切回來」是攔得到的——分頁從背景切回前景時觸發visibilitychange，這裡立刻主動
+// 檢查一次有沒有還沒送出去的異動，有的話馬上重試，不用乾等最長3分鐘的背景定期同步，
+// 把「下單→切LINE分享→切回來」這個最容易漏單的流程缺口補起來。
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState !== 'visible') return;
+  if(!currentAccount) return;
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  if(hasPending && getGasUrl() && !cloudPushInFlight){
+    pullFromCloud(false); // 內部會判斷hasPendingLocalChanges並自動補送，邏輯共用
   }
 });
 </script>
