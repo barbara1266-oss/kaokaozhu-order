@@ -818,6 +818,45 @@ const PENDING_SYNC_KEY = 'kklz_pending_sync_v1';
 // 本機狀態都到齊了」。用一個單調遞增的版本號，push開始時記下目前版本，回應回來時
 // 只有「版本號完全沒變過」才代表這段期間沒有新異動插進來，才能真的清掉旗標。
 let localChangeVersion = 0;
+// 2026-10-02新增（Barbara要求修同步速度偏慢/偶爾失敗的問題）：記錄「上一次成功送到
+// 雲端、確認收到的時間點」，讓每次push不用再把整包db（全部供應商/品項/歷史訂單/
+// 單價紀錄/操作紀錄）都送一次，只送「這個時間點之後有異動過」的那一小部分。
+// 原理：後端mergeDb_()本來就是「送來的資料」跟「雲端現有資料」取聯集、用updatedAt
+// 比較新舊（見這支檔案最後mergeDb_的註解、以及後端程式碼同一套邏輯），根本不要求
+// 前端送「完整」的items/orders/suppliers/priceLog/actionLog——沒送到的那些，後端
+// 會直接沿用雲端現有版本，一樣在聯集裡，不會不見。刪除動作本來就是靠墓碑清單
+// （deletedItemIds等）判斷，跟陣列本身有沒有送齊完全無關，所以這個優化不影響刪除。
+// 只送「有變動的」，payload大小大致只跟「這次異動了多少筆」成正比，不再跟著歷史
+// 資料（訂單/操作紀錄越存越多）一起變大、變慢。
+// 安全性：預設值是EPOCH_ISO（最早的時間），代表「從來沒成功同步過」，第一次送出
+// 時效果等同以前的全量送出，之後每次成功送達才會把這個時間點往前推進，不會漏送。
+const LAST_SYNCED_AT_KEY = 'kklz_last_synced_at_v1';
+function getLastSyncedAt(){
+  try{ return localStorage.getItem(LAST_SYNCED_AT_KEY) || EPOCH_ISO; }catch(e){ return EPOCH_ISO; }
+}
+function setLastSyncedAt(iso){
+  try{ localStorage.setItem(LAST_SYNCED_AT_KEY, iso); }catch(e){}
+}
+// 換雲端網址／還原備份這兩個動作，都代表「對方（新網址的後端，或還原前的雲端狀態）
+// 不一定擁有本機現在這份資料的歷史」，這時候保守起見強制整包重新送一次（把水位
+// 退回EPOCH_ISO），不要冒險漏送，之後才繼續用delta。
+function resetLastSyncedAt_(){
+  try{ localStorage.removeItem(LAST_SYNCED_AT_KEY); }catch(e){}
+}
+// 把目前db拆成「要送出去的這包」：items/suppliers/orders/priceLog/actionLog這5個
+// 會隨時間一直長大的陣列，只挑「比上次成功同步時間點更新」的部分；其他全部欄位
+// （accounts/settings/cart/cartUpdatedAt/lastOrderBySupplier/刪除墓碑/license/
+// currentRole...）體積本來就小、不是效能瓶頸，維持整包送出，邏輯最簡單也最安全。
+const DELTA_ARRAY_FIELDS_ = { items:'updatedAt', suppliers:'updatedAt', orders:'updatedAt', priceLog:'timeISO', actionLog:'time' };
+function buildDeltaPayload_(sinceISO){
+  const since = sinceISO || EPOCH_ISO;
+  const payload = Object.assign({}, db);
+  Object.keys(DELTA_ARRAY_FIELDS_).forEach(key=>{
+    const field = DELTA_ARRAY_FIELDS_[key];
+    payload[key] = (db[key]||[]).filter(r => ((r && r[field]) || EPOCH_ISO) > since);
+  });
+  return payload;
+}
 const ROLES = ['維護專員','管理者','叫貨者','營運(唯讀)'];
 const LEGACY_ROLE_MAP = {'店經理':'叫貨者','採購':'叫貨者','後台驗收':'叫貨者','預備人員':'叫貨者'}; // 舊角色名稱自動對應到新角色
 /* 權限分三層：
@@ -843,6 +882,9 @@ function setGasUrl(url){
   // 都會同步到新網址去，等於資料外洩或直接失聯，風險等同帳密外流，務必守住。
   if(!isMaintainer()) return;
   localStorage.setItem(GAS_URL_KEY, url.trim());
+  // 換了網址＝對方（新後端）不一定擁有本機資料的同步歷史，水位退回最早，
+  // 強制下一次push整包送出，不要冒險漏送。
+  resetLastSyncedAt_();
 }
 
 function loadDB(){
@@ -972,11 +1014,19 @@ async function pushOnce_(){
   lastPushRemoteData = null; // 每次呼叫一開始先清掉，避免這次其實走舊版相容路徑
                               // （沒有res.data），卻誤用上一次成功的舊資料去驗證這一次
   versionAtLastPushStart = localChangeVersion;
+  // 2026-10-02新增：這裡「拍照」的時間點，就是這次payload裡「比這個時間點更新」的
+  // 篩選基準，也是這次送出成功後水位要往前推進到的新時間點——兩者必須是同一個時間，
+  // 不能分別取「現在」兩次，否則篩選範圍跟水位會對不上，可能漏送掉中間這段時間的異動。
+  const deltaCaptureTime_ = nowISO();
+  const payload_ = buildDeltaPayload_(getLastSyncedAt());
   try{
     const r = await fetch(url, {
       method:'POST',
       headers:{'Content-Type':'text/plain;charset=utf-8'}, // 避免觸發CORS預檢，GAS不支援OPTIONS
-      body: JSON.stringify(db),
+      body: JSON.stringify(payload_), // 2026-10-02改為只送「上次成功同步之後有異動」的部分（delta），
+                                        // 不再是JSON.stringify(db)整包——後端mergeDb_()本來就是
+                                        // 聯集＋比新舊時間，沒送到的部分會直接沿用雲端現有版本，
+                                        // 不會不見；詳見上面buildDeltaPayload_的說明。
     });
     const res = await r.json();
     if(!res || !res.ok) return false;
@@ -996,6 +1046,10 @@ async function pushOnce_(){
       sortByTimeFieldDesc(db.orders, 'createdAtISO');
       sortByTimeFieldDesc(db.priceLog, 'timeISO');
       saveDBLocalOnly();
+      // 伺服器確認收到了「拍照那一刻之前的異動」，水位往前推進到那個時間點——不是「現在」，
+      // 因為網路來回這幾秒之間，本機可能又有新異動發生，那些要留給下一次delta送出，
+      // 不能因為這次成功就誤判「全部都到齊了」而漏送。
+      setLastSyncedAt(deltaCaptureTime_);
       return true;
     }
     // 相容舊版後端（還沒更新GAS程式碼、回應沒有data欄位）：退回舊式兩段式做法，
@@ -2569,6 +2623,9 @@ function importBackup(evt){
     );
     if(!ok){ evt.target.value=''; return; }
     db = parsed;
+    // 還原備份＝本機資料被整包換掉，雲端未必擁有這份內容的同步歷史，水位退回最早，
+    // 強制下面「saveDB()觸發雲端同步」那一次整包送出，不要冒險漏送。
+    resetLastSyncedAt_();
     normalizeDbShape(); // 備份檔可能缺少settings/license/priceLog等欄位，先補齊，避免還原後畫面渲染一半壞掉
     // 備份檔可能是舊格式（例如還沒拆分供應商、角色名稱是舊的），跟pullFromCloud()一樣，
     // 還原後要重跑一次資料轉換，不然畫面會殘留舊格式資料，要等下次整頁重新整理才會修正。
