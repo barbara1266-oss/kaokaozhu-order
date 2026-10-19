@@ -80,6 +80,19 @@ body.readonly .readonly-badge{display:inline-block;}
 .add-supplier-row{display:flex;gap:8px;margin-top:10px;}
 .add-supplier-row input{flex:1;border:1px solid var(--line);border-radius:var(--radius-sm);
   padding:13px 14px;font-size:16px;}
+/* 2026-10-18：「新增供應商」移到下單首頁最上方，虛線紅框，供應商多時不用滑到底 */
+.add-supplier-top{display:flex;gap:8px;margin:0 0 14px;padding:10px;border:2px dashed var(--brand);
+  border-radius:var(--radius);background:#FDF3EF;}
+.add-supplier-top input{flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:12px 8px;font-size:16px;background:#fff;}
+.add-supplier-top input::placeholder{font-size:14px;letter-spacing:-.3px;}
+.add-supplier-top button{background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:12px 14px;font-size:16px;font-weight:700;white-space:nowrap;}
+.co-pick-row{display:flex;align-items:center;gap:10px;margin:0 0 10px;}
+.co-pick-row input{width:24px;height:24px;accent-color:var(--brand);flex:none;}
+.co-pick-row h3{margin:0 !important;}
+.supplier-block.skipped{opacity:.5;}
+.co-pick-hint{font-size:13px;color:var(--gray);margin:0 0 10px;}
 .icon-btn{border:1px solid var(--line);background:var(--card);border-radius:var(--radius-sm);
   padding:13px 16px;font-size:15px;font-weight:600;color:var(--brand);}
 .supplier-manage-item{display:flex;justify-content:space-between;align-items:center;
@@ -268,13 +281,13 @@ body.readonly .readonly-badge{display:inline-block;}
 
 <div class="topbar">
   <div>
-    <h1 id="shopNameDisplay">🔥 燒酒烤烤豬</h1>
+    <h1 id="shopNameDisplay" style="white-space:nowrap;">🔥 燒酒烤烤豬</h1>
     <div class="sub"><span id="appSubDisplay">叫貨系統</span> <span class="readonly-badge">唯讀模式</span></div>
   </div>
   <div class="role-pick" id="loggedInBar">
-    <span id="loggedInLabel" style="color:#fff;font-size:14px;"></span>
+    <span id="loggedInLabel" style="color:#fff;font-size:13px;line-height:1.3;max-width:150px;"></span>
     <button onclick="doLogout()" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);
-      border-radius:8px;padding:8px 12px;font-size:14px;">登出</button>
+      border-radius:8px;padding:8px 12px;font-size:14px;white-space:nowrap;flex-shrink:0;">登出</button>
   </div>
 </div>
 
@@ -283,7 +296,7 @@ body.readonly .readonly-badge{display:inline-block;}
   <button onclick="manualRetrySync()">立即重試</button>
 </div>
 <div class="sync-success-banner" id="syncSuccessBanner"></div>
-<div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span></div>
+<div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span><span id="verText" style="margin-left:8px;font-size:10px;color:var(--gray);opacity:.8;"></span></div>
 
 <!-- ============ 登入畫面 ============ -->
 <div class="modal-mask show" id="loginGate" style="align-items:center;z-index:300;">
@@ -301,11 +314,11 @@ body.readonly .readonly-badge{display:inline-block;}
 <!-- ============ 頁面1：下單－選供應商 ============ -->
 <section class="page active" id="page-order">
   <div class="page-title">選擇供應商 <span class="cnt" id="supplierCount"></span></div>
-  <div id="supplierList"></div>
-  <div class="add-supplier-row" id="addSupplierRow">
-    <input type="text" id="newSupplierName" placeholder="新增供應商名稱…">
-    <button class="icon-btn" onclick="addSupplier()">＋新增</button>
+  <div class="add-supplier-top" id="addSupplierRow">
+    <input type="text" id="newSupplierName" placeholder="＋ 新廠商？在這裡輸入名稱直接新增" onkeydown="if(event.key==='Enter')addSupplier()">
+    <button onclick="addSupplier()">新增</button>
   </div>
+  <div id="supplierList"></div>
 </section>
 
 <!-- ============ 頁面2：品項清單（單一供應商） ============ -->
@@ -476,7 +489,7 @@ body.readonly .readonly-badge{display:inline-block;}
     <div class="info" id="checkoutInfoLine">已選 0 家供應商</div>
     <div class="total">NTD <span id="cartTotal">0</span></div>
   </div>
-  <button onclick="goPage('page-checkout');renderCheckout();">前往結帳</button>
+  <button onclick="goPage('page-checkout');resetCheckoutPicks_();renderCheckout();">前往結帳</button>
 </div>
 
 <!-- LINE分享彈窗 -->
@@ -871,7 +884,71 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
+const APP_VERSION = '2026.10.18-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
+// ===== 2026-10-14新增：雲端存取代碼 =====
+// 以前後端網址只要被人知道，不用登入就能直接讀走整個資料庫（含帳號清單）。
+// 現在後端多一道「店家代碼」：每台裝置第一次使用輸入一次，之後自動帶上。
+// 做法：包一層fetch，只要是送去雲端網址的請求，GET就在網址加 ?t=代碼，POST就在內容最前面加 "__t"。
+// 後端回 needAuth 時，自動跳出輸入代碼的視窗。
+const ACCESS_TOKEN_KEY = 'kaokaozhu_access_token_v1';
+function getAccessToken_(){ try{ return localStorage.getItem(ACCESS_TOKEN_KEY)||''; }catch(e){ return ''; } }
+function setAccessToken_(t){ try{ localStorage.setItem(ACCESS_TOKEN_KEY, String(t||'').trim()); }catch(e){} }
+(function installGasFetchWrapper_(){
+  const origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    let g = '';
+    try{ g = getGasUrl(); }catch(e){}
+    if(g && typeof input==='string' && input===g){
+      const t = getAccessToken_();
+      if(t){
+        if(init && init.method==='POST' && typeof init.body==='string' && init.body.charAt(0)==='{'){
+          init = Object.assign({}, init, { body: '{"__t":' + JSON.stringify(t) + (init.body.length>2 ? ',' : '') + init.body.slice(1) });
+        } else if(!init || !init.method || init.method==='GET'){
+          input = g + (g.indexOf('?')>=0 ? '&' : '?') + 't=' + encodeURIComponent(t);
+        }
+      }
+      return origFetch(input, init).then(r=>{
+        try{ r.clone().json().then(j=>{ if(j && j.needAuth) showAccessTokenModal_(); }).catch(()=>{}); }catch(e){}
+        return r;
+      });
+    }
+    return origFetch(input, init);
+  };
+})();
+function showAccessTokenModal_(wrong){
+  let m = document.getElementById('tokenModal');
+  if(!m){
+    m = document.createElement('div');
+    m.id = 'tokenModal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);">'
+      + '<div style="font-size:18px;font-weight:700;margin-bottom:6px;">🔑 請輸入店家代碼</div>'
+      + '<div id="tokenModalMsg" style="font-size:13px;color:#666;line-height:1.6;margin-bottom:12px;">系統做了安全升級。這台裝置第一次使用，請輸入店長給您的代碼，<b>只需要輸入一次</b>。</div>'
+      + '<input id="tokenModalInput" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="貼上或輸入代碼" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:10px;">'
+      + '<button onclick="submitAccessToken_()" style="width:100%;margin-top:12px;padding:13px;font-size:16px;font-weight:700;border:0;border-radius:10px;background:var(--brand,#c0392b);color:#fff;">確認</button>'
+      + '<div style="font-size:11px;color:#999;margin-top:10px;text-align:center;">沒有代碼？請向店長或維護人員索取</div></div>';
+    document.body.appendChild(m);
+  }
+  const msg = document.getElementById('tokenModalMsg');
+  if(wrong && msg){ msg.innerHTML = '<span style="color:#c0392b;font-weight:700;">代碼不正確，請再確認一次。</span>'; }
+  m.style.display = 'flex';
+  setTimeout(()=>{ const i=document.getElementById('tokenModalInput'); if(i) i.focus(); }, 50);
+}
+function submitAccessToken_(){
+  const i = document.getElementById('tokenModalInput');
+  const v = i ? i.value.trim() : '';
+  if(!v){ return; }
+  setAccessToken_(v);
+  const m = document.getElementById('tokenModal'); if(m) m.style.display = 'none';
+  if(i) i.value = '';
+  lastSyncErrorReason_ = '';
+  fetch(getGasUrl()).then(r=>r.json()).then(j=>{
+    if(j && j.needAuth){ setAccessToken_(''); showAccessTokenModal_(true); }
+    else { showToast('代碼已確認'); pullFromCloud(false); }
+  }).catch(()=>{ showToast('網路不穩，稍後會自動重試'); });
+}
 function getGasUrl(){
   const stored = localStorage.getItem(GAS_URL_KEY);
   if(stored===null) return DEFAULT_GAS_URL; // 從未設定過，用內建預設值
@@ -922,6 +999,17 @@ function saveDB(){
   localChangeVersion++; // 記一筆「本機又變了」，push完成時用來判斷這次送出的是不是最新版本
   queueCloudSync();
 }
+// 2026-10-14新增：同步失敗的「原因」。之前失敗只顯示一句「雲端同步失敗」，店家看不懂
+// 是網路問題還是系統問題。這裡把原因轉成白話，顯示在同步狀態文字上。
+let lastSyncErrorReason_ = '';
+function friendlySyncReason_(res, err){
+  const msg = String((res && (res.error||res.message)) || (err && err.message) || '');
+  if(/資料量|50000|50,000|上限|limit/i.test(msg)) return '雲端資料量已達上限，請聯絡維護人員';
+  if(/lock|忙線|busy|逾時|timeout/i.test(msg)) return '雲端忙線中，稍後會自動重試';
+  if(/auth|權限|代碼|token|unauthor/i.test(msg)) return '代碼不正確或已失效';
+  if(err) return '網路不穩或已離線，連線後會自動補送';
+  return msg ? '雲端回報異常，稍後會自動重試' : '原因不明，稍後會自動重試';
+}
 function setSyncStatus(mode){
   // mode: 'local' | 'synced' | 'syncing' | 'error' | 'offline'
   const dot = document.getElementById('syncDot');
@@ -931,7 +1019,7 @@ function setSyncStatus(mode){
     local:   {cls:'', label:'資料已存於本機'},
     synced:  {cls:'', label:'已同步至雲端（多人共用）'},
     syncing: {cls:'off', label:'同步中…'},
-    error:   {cls:'off', label:'雲端同步失敗，暫存本機'},
+    error:   {cls:'off', label:'雲端同步失敗，暫存本機' + (lastSyncErrorReason_ ? '（'+lastSyncErrorReason_+'）' : '')},
     offline: {cls:'off', label:'尚未設定雲端同步，僅本機儲存'},
   };
   const m = map[mode]||map.local;
@@ -1029,7 +1117,8 @@ async function pushOnce_(){
                                         // 不會不見；詳見上面buildDeltaPayload_的說明。
     });
     const res = await r.json();
-    if(!res || !res.ok) return false;
+    if(!res || !res.ok){ lastSyncErrorReason_ = friendlySyncReason_(res, null); return false; }
+    lastSyncErrorReason_ = '';
     if(res.data){
       // 2026-10-01抓到的真正根因：這裡原本是「db = JSON.parse(res.data)」整包蓋掉。
       // 如果這次push送出之後、回應還沒回來之前這段期間（2-6秒），本機又因為別的
@@ -1056,6 +1145,7 @@ async function pushOnce_(){
     // 確保前後端其中一邊還沒更新完成的過渡期間不會壞掉。
     return await legacyGetMergePost_();
   }catch(e){
+    lastSyncErrorReason_ = friendlySyncReason_(null, e);
     return false; // 網路問題、逾時等，呼叫端自行決定要不要重試
   }
 }
@@ -1127,13 +1217,11 @@ function mergeRemoteIntoLocal(remote){
       normalizeDbShape(); // 對方的settings可能是還沒升級過的舊格式，補齊欄位避免畫面顯示異常
     }
   }
-  // 購物車是「打到一半的訂單」，不是歷史紀錄，沒辦法逐筆比對誰改了什麼，
-  // 用整包比較cartUpdatedAt決定誰的購物車內容比較新，避免正在打單的裝置被舊裝置蓋掉。
+  // 2026-10-18：購物車改成「每家供應商各自比較時間」合併（內場/外場同時打不同供應商不再互蓋）。
+  // 規則跟後台mergeDb_完全同一套（mergeCartBySupplier_），不要只改一邊。
   if(remote.cart && typeof remote.cart==='object'){
-    if((remote.cartUpdatedAt||EPOCH_ISO) > (db.cartUpdatedAt||EPOCH_ISO)){
-      db.cart = remote.cart;
-      db.cartUpdatedAt = remote.cartUpdatedAt||EPOCH_ISO;
-    }
+    const r = mergeCartBySupplier_(db, remote);
+    db.cart = r.cart; db.cartUpdatedAtBySupplier = r.map; db.cartUpdatedAt = r.cartUpdatedAt;
   }
   if(remote.lastOrderBySupplier && typeof remote.lastOrderBySupplier==='object'){
     db.lastOrderBySupplier = Object.assign({}, remote.lastOrderBySupplier, db.lastOrderBySupplier);
@@ -1203,12 +1291,18 @@ function pullFromCloud(showMsg){
         if(currentAccount){ renderAll(); renderLicenseBanner(); renderLicenseGate(); }
         setSyncStatus('synced');
         if(showMsg) showToast('已從雲端載入最新資料');
-      }catch(e){ setSyncStatus('error'); }
+      }catch(e){ lastSyncErrorReason_ = '雲端資料格式異常'; setSyncStatus('error'); }
+    } else if(res && res.ok === false){
+      // 2026-10-14修正「假綠燈」：後端回報失敗（ok:false）時，以前也顯示「已同步」，
+      // 店家會以為資料沒問題。現在如實顯示失敗與原因。
+      lastSyncErrorReason_ = friendlySyncReason_(res, null);
+      setSyncStatus('error');
+      if(showMsg) showToast('雲端回報異常：' + lastSyncErrorReason_);
     } else {
-      setSyncStatus('synced'); // 雲端還沒有資料，代表這是第一次，維持本機現有內容
+      setSyncStatus('synced'); // 雲端還沒有資料（ok:true但沒有data），代表這是第一次，維持本機現有內容
       if(showMsg) showToast('雲端尚無資料，將以目前本機資料為準');
     }
-  }).catch(()=>{ setSyncStatus('error'); if(showMsg) showToast('雲端連線失敗'); });
+  }).catch((e)=>{ lastSyncErrorReason_ = friendlySyncReason_(null, e); setSyncStatus('error'); if(showMsg) showToast('雲端連線失敗'); });
 }
 function saveDBLocalOnly(){
   try{ localStorage.setItem(DB_KEY, JSON.stringify(db)); }catch(e){}
@@ -1261,6 +1355,37 @@ function seedDB(){
 const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
 function nowISO(){ return new Date().toISOString(); }
 
+// ---------- 2026-10-18：購物車「每家供應商各自」記時間戳 ----------
+// 改某家供應商的購物車（含清空）時，只更新那一家的時間；整包的cartUpdatedAt也一起更新，給舊版相容用。
+function touchCartSupplier_(sid){
+  const t = nowISO();
+  if(!db.cartUpdatedAtBySupplier || typeof db.cartUpdatedAtBySupplier!=='object') db.cartUpdatedAtBySupplier = {};
+  db.cartUpdatedAtBySupplier[sid] = t;
+  db.cartUpdatedAt = t;
+}
+// a＝本機（後台是「剛送來的」），b＝對方。逐家供應商比時間，較新者勝；一樣新留a。
+// 對方如果是舊版（沒有逐家時間），就用它整包的cartUpdatedAt當每一家的時間（相容舊版）。
+// ※後台 mergeDb_ 裡有一模一樣的一份，兩邊規則必須一致。
+function mergeCartBySupplier_(a, b){
+  const obj = v => (v && typeof v==='object') ? v : null;
+  const aCart = obj(a.cart)||{}, bCart = obj(b.cart)||{};
+  const aMap = obj(a.cartUpdatedAtBySupplier), bMap = obj(b.cartUpdatedAtBySupplier);
+  const tsOf = (map, whole, sid) => map ? (map[sid]||EPOCH_ISO) : (whole||EPOCH_ISO);
+  const ids = {};
+  [aCart, bCart, aMap||{}, bMap||{}].forEach(o=>Object.keys(o).forEach(k=>{ ids[k]=true; }));
+  const cart = {}, map = {};
+  Object.keys(ids).forEach(sid=>{
+    const at = tsOf(aMap, a.cartUpdatedAt, sid), bt = tsOf(bMap, b.cartUpdatedAt, sid);
+    const useB = bt > at;
+    const src = useB ? bCart : aCart;
+    if(src[sid] && typeof src[sid]==='object' && Object.keys(src[sid]).length) cart[sid] = Object.assign({}, src[sid]);
+    const ts = useB ? bt : at;
+    if(ts > EPOCH_ISO) map[sid] = ts;
+  });
+  const aw = a.cartUpdatedAt||EPOCH_ISO, bw = b.cartUpdatedAt||EPOCH_ISO;
+  return { cart, map, cartUpdatedAt: (bw > aw ? bw : aw) };
+}
+
 // 補齊db缺少的欄位，避免舊資料/匯入的備份檔缺欄位時，畫面渲染到一半直接壞掉。
 // 開機時跑一次，還原備份檔（importBackup）之後也要再跑一次，不能只在開機時跑。
 function normalizeDbShape(){
@@ -1281,6 +1406,11 @@ function normalizeDbShape(){
   if(!Array.isArray(db.actionLog)) db.actionLog = []; // 2026-10-01新增：統一操作紀錄（誰、什麼時候、做了什麼），同步到後台試算表的「操作紀錄」分頁
   if(!db.cart || typeof db.cart!=='object') db.cart = {};
   if(!db.cartUpdatedAt) db.cartUpdatedAt = EPOCH_ISO;
+  // 2026-10-18：逐家供應商的購物車時間戳；舊資料沒有的話，用整包時間補給購物車裡現有的每一家
+  if(!db.cartUpdatedAtBySupplier || typeof db.cartUpdatedAtBySupplier!=='object'){
+    db.cartUpdatedAtBySupplier = {};
+    Object.keys(db.cart).forEach(sid=>{ db.cartUpdatedAtBySupplier[sid] = db.cartUpdatedAt; });
+  }
   if(!db.lastOrderBySupplier || typeof db.lastOrderBySupplier!=='object') db.lastOrderBySupplier = {};
   if(!db.currentRole) db.currentRole = ROLES[0];
   // 多裝置合併同步要用的時間戳記／墓碑清單／唯一id，舊資料沒有的話在這裡補齊
@@ -1810,7 +1940,7 @@ function setQtyDirect(sid, itemId, val){
   if(!qty || qty<=0){ delete db.cart[sid][itemId]; }
   else { db.cart[sid][itemId] = qty; }
   if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
-  db.cartUpdatedAt = nowISO();
+  touchCartSupplier_(sid);
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
 }
 function updateItemPrice(itemId, val){
@@ -1918,10 +2048,11 @@ function deleteItem(itemId){
   db.items = db.items.filter(i=>i.id!==itemId);
   db.deletedItemIds.push({id:itemId, deletedAt:nowISO()}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
   for(const sid in db.cart){
+    if(!(itemId in db.cart[sid])) continue;
     delete db.cart[sid][itemId];
     if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
+    touchCartSupplier_(sid);
   }
-  db.cartUpdatedAt = nowISO();
   if(deletedItem){
     const s = db.suppliers.find(x=>x.id===deletedItem.supplierId);
     logAction('刪除品項', s?s.name:'', deletedItem.name);
@@ -1942,7 +2073,7 @@ function quickReorder(){
   });
   if(Object.keys(filtered).length===0){ showToast('上次訂購的品項都已經被刪除了，請重新挑選品項'); return; }
   db.cart[sid] = filtered;
-  db.cartUpdatedAt = nowISO();
+  touchCartSupplier_(sid);
   saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
   showToast(droppedCount>0 ? `已複製上次訂單內容（${droppedCount}項已刪除的品項自動略過）` : '已複製上次訂單內容，可微調數量');
 }
@@ -1991,9 +2122,32 @@ function updateCheckoutBar(){
 }
 
 /* ---------- 結帳頁 ---------- */
+// 2026-10-18：送出頁每家供應商可勾選，預設全勾；沒勾的留在購物車，不送出。
+function resetCheckoutPicks_(){ state.checkoutSkip = {}; }
+function checkoutSelectedSids_(){
+  const skip = state.checkoutSkip||{};
+  return Object.keys(db.cart).filter(sid=> !skip[sid] && db.suppliers.some(s=>s.id===sid));
+}
+function toggleCheckoutPick_(sid, checked){
+  if(!state.checkoutSkip) state.checkoutSkip = {};
+  if(checked) delete state.checkoutSkip[sid]; else state.checkoutSkip[sid] = true;
+  renderCheckout();
+}
+function checkoutSelectedTotal_(){
+  let total = 0;
+  checkoutSelectedSids_().forEach(sid=>{
+    for(const itemId in db.cart[sid]){
+      const item = db.items.find(i=>i.id===itemId);
+      if(item) total += item.price * db.cart[sid][itemId];
+    }
+  });
+  return money(total);
+}
 function renderCheckout(){
   const wrap = document.getElementById('checkoutBody');
+  const skip = state.checkoutSkip||{};
   let html='';
+  let blockCount = 0;
   for(const sid in db.cart){
     const s = db.suppliers.find(x=>x.id===sid);
     if(!s) continue; // 供應商已被刪除，購物車殘留資料略過
@@ -2008,11 +2162,19 @@ function renderCheckout(){
       rows += `<div class="co-item"><span>${escapeHtml(item.name)}　x${qty}　（${escapeHtml(item.unit)}）</span><span>NTD ${money(lineTotal)}</span></div>`;
     }
     if(!rows) continue;
-    html += `<div class="supplier-block"><h3>${escapeHtml(s.name)}</h3>${rows}
+    blockCount++;
+    const picked = !skip[sid];
+    html += `<div class="supplier-block ${picked?'':'skipped'}" data-sid="${sid}">
+      <label class="co-pick-row"><input type="checkbox" class="co-pick" data-sid="${sid}" ${picked?'checked':''}
+        onchange="toggleCheckoutPick_('${sid}', this.checked)"><h3>${escapeHtml(s.name)}</h3></label>${rows}
       <div class="co-sub"><span>小計</span><span>NTD ${money(sub)}</span></div></div>`;
   }
+  if(html){
+    const n = checkoutSelectedSids_().length;
+    html = `<div class="co-pick-hint">已勾選 ${n} / ${blockCount} 家。只會送出有勾的；沒勾的會留在購物車，之後再送。</div>` + html;
+  }
   wrap.innerHTML = html || '<div class="empty">購物車是空的</div>';
-  document.getElementById('grandTotal').textContent = cartGrandTotal();
+  document.getElementById('grandTotal').textContent = checkoutSelectedTotal_();
   if(!document.getElementById('deliveryDate').value){
     const d = new Date(); d.setDate(d.getDate()+1);
     document.getElementById('deliveryDate').value = d.toISOString().slice(0,10);
@@ -2027,10 +2189,12 @@ function renderCheckout(){
 // 送出失敗的話，訂單還是安全存在本機（不會不見），畫面改顯示「重新送出」讓使用者自己重試。
 async function confirmCheckout(){
   if(cartSuppliersCount()===0) return;
+  const selectedSids = checkoutSelectedSids_();
+  if(selectedSids.length===0){ showToast('請至少勾選一家供應商'); return; }
   const date = document.getElementById('deliveryDate').value;
   const note = document.getElementById('orderNote').value.trim();
   const newOrders = [];
-  for(const sid in db.cart){
+  for(const sid of selectedSids){
     const s = db.suppliers.find(x=>x.id===sid);
     if(!s) continue; // 供應商已被刪除，這筆購物車殘留資料略過
     const items = Object.keys(db.cart[sid]).map(itemId=>{
@@ -2058,8 +2222,15 @@ async function confirmCheckout(){
     logAction('下單', s.name, `${order.id} / ${items.map(it=>it.name+' x'+it.qty).join('、')}`);
   }
   if(newOrders.length===0) return; // 購物車裡的品項/供應商全部被刪除過，沒有任何有效訂單可以送出
-  db.cart = {};
-  db.cartUpdatedAt = nowISO();
+  // 2026-10-18：只清掉「這次有勾、已送出」的供應商購物車；沒勾的留著。
+  // 供應商已被刪除的殘留購物車也順便清掉（跟以前整包清空的效果一致）。
+  Object.keys(db.cart).forEach(sid=>{
+    if(selectedSids.includes(sid) || !db.suppliers.some(s=>s.id===sid)){
+      delete db.cart[sid];
+      touchCartSupplier_(sid);
+    }
+  });
+  resetCheckoutPicks_();
   document.getElementById('orderNote').value='';
   renderSupplierList();
   updateCheckoutBar();
@@ -2448,6 +2619,21 @@ function allOkReceive(orderId){
 function confirmReceive(orderId){
   if(isReadonly()) return; // 唯讀身份不可確認收貨（畫面按鈕已隱藏，這裡再擋一次避免被繞過）
   const o = db.orders.find(x=>x.id===orderId);
+  // 2026-10-14新增：實收數量／單價如果被清空（沒填），以前會默默當成0，帳就變成「沒收到」。
+  // 送出前先找出空白的品項，讓店家確認是真的沒收到，還是漏填。
+  {
+    const blanks = [];
+    o.items.forEach((it,idx)=>{
+      ['qty','price'].forEach(f=>{
+        const el = document.querySelector(`input[data-idx="${idx}"][data-field="${f}"]`);
+        if(el && String(el.value).trim()===''){ blanks.push(`${it.name}（${f==='qty'?'實收數量':'實收單價'}）`); }
+      });
+    });
+    if(blanks.length){
+      const goOn = window.confirm(`有 ${blanks.length} 個欄位是空白的，送出後會當成 0：\n\n${blanks.join('\n')}\n\n確定這些真的是 0（沒收到／免費）嗎？\n按「取消」回去補填。`);
+      if(!goOn) return;
+    }
+  }
   const received = [];
   o.items.forEach((it,idx)=>{
     const actualQty = parseFloat(document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`).value)||0;
@@ -2469,8 +2655,39 @@ function confirmReceive(orderId){
       : '全部到齊、金額無誤';
     logAction('收貨確認', o.supplierName, `${o.id} / ${summary}`);
   }
+  const priceUpdates = autoUpdatePricesFromReceive_(o, received);
   saveDB(); renderReceive();
-  showToast('已完成收貨確認');
+  showToast(priceUpdates.length ? `已完成收貨確認；${priceUpdates.join('、')}` : '已完成收貨確認');
+}
+// 2026-10-18（Barbara選「自動」）：收貨時輸入的實收單價跟品項目前單價不同，就自動把品項單價改成新價，
+// 下次下單直接顯示新價。例：建檔雞蛋80，收貨輸入90 → 品項單價變90。
+// 不動的情況：實收單價或數量≤0（含退貨負數、0元）、品項目前單價≤0或留空（浮動價）、
+// 這張單比「品項最近一次改價」還舊（晚收的舊單不能把新價蓋回舊價）。已送出的舊單金額不變。
+function autoUpdatePricesFromReceive_(o, received){
+  const msgs = [];
+  if(!o || !Array.isArray(o.items)) return msgs;
+  const orderISO = o.createdAtISO || EPOCH_ISO;
+  o.items.forEach((it, idx)=>{
+    const r = received[idx];
+    if(!r || !it.itemId) return;
+    const item = db.items.find(i=>i.id===it.itemId);
+    if(!item) return;
+    const cur = (typeof item.price==='number') ? item.price : parseFloat(item.price);
+    if(!(cur > 0)) return;
+    if(!(r.actualPrice > 0) || !(r.actualQty > 0)) return;
+    if(r.actualPrice === cur) return;
+    const lastChange = (db.priceLog||[]).filter(l=>l && l.itemId===item.id)
+      .reduce((m,l)=> ((l.timeISO||EPOCH_ISO) > m ? (l.timeISO||EPOCH_ISO) : m), EPOCH_ISO);
+    if(!(orderISO > lastChange)) return;
+    const t = nowISO();
+    item.price = r.actualPrice;
+    item.updatedAt = t;
+    db.priceLog.unshift({id:'pl'+Math.random().toString(36).slice(2)+Date.now(), itemId:item.id, itemName:item.name, old:cur, next:r.actualPrice,
+      role: currentAccount?currentAccount.role:'', time:new Date().toLocaleString('zh-TW',{hour12:false}), timeISO:t});
+    logAction('收貨自動改價', o.supplierName, `${item.name}：NTD ${cur} → NTD ${r.actualPrice}（依 ${o.id} 收貨）`);
+    msgs.push(`${item.name}單價已更新為 ${r.actualPrice}`);
+  });
+  return msgs;
 }
 
 /* ---------- 庫存盤點 ---------- */
@@ -2731,7 +2948,7 @@ function deleteSupplier(id){
   db.items = db.items.filter(i=>i.supplierId!==id);
   removedItemIds.forEach(itemId=>{ db.deletedItemIds.push({id:itemId, deletedAt}); }); // 供應商底下的品項也一併記錄刪除，不然合併時會被復活
   delete db.cart[id];
-  db.cartUpdatedAt = nowISO();
+  touchCartSupplier_(id);
   if(deletedSupplier) logAction('刪除供應商', deletedSupplier.name, `連同${removedItemIds.length}個品項一併刪除`);
   saveDB(); renderAdmin(); renderSupplierList();
   showToast('已刪除供應商');
@@ -2892,9 +3109,10 @@ function migrateHanjiSplit(){
       if(!it) return;
       if(!db.cart[it.supplierId]) db.cart[it.supplierId]={};
       db.cart[it.supplierId][itemId] = db.cart[old.id][itemId];
+      touchCartSupplier_(it.supplierId);
     });
     delete db.cart[old.id];
-    db.cartUpdatedAt = nowISO();
+    touchCartSupplier_(old.id);
   }
   db.suppliers = db.suppliers.filter(s=>s.id!==old.id);
   db.deletedSupplierIds.push({id:old.id, deletedAt:nowISO()});
@@ -2929,7 +3147,8 @@ function mergeDuplicateSuppliers(){
           db.cart[keep.id][itemId] = (db.cart[keep.id][itemId]||0) + db.cart[s.id][itemId];
         });
         delete db.cart[s.id];
-        db.cartUpdatedAt = nowISO();
+        touchCartSupplier_(s.id);
+        touchCartSupplier_(keep.id);
       }
       if(db.lastOrderBySupplier && db.lastOrderBySupplier[s.id]){
         if(!db.lastOrderBySupplier[keep.id]) db.lastOrderBySupplier[keep.id] = db.lastOrderBySupplier[s.id];
