@@ -911,7 +911,7 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
-const APP_VERSION = '2026.10.20-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+const APP_VERSION = '2026.10.21-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
 document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
 // ===== 2026-10-14新增：雲端存取代碼 =====
@@ -964,10 +964,24 @@ let tokenEntryResolve_ = null;   // 開門時等待代碼輸入完成用
     return origFetch(input, init);
   };
 })();
-function markAuthNeedsReentry_(){
+// 2026-10-21：收到「需要代碼」不馬上相信——先用目前的代碼直接問雲端一次，確定真的錯了才顯示提示。
+// （避免任何偶發狀況讓店員看到「輸入代碼」，又被打斷一次）
+let authVerifyInFlight_ = null;
+let lastPullNeedAuth_ = false;
+function setAuthNeeded_(){
   authNeedsReentry_ = true;
   lastSyncErrorReason_ = '這台裝置需要重新輸入店家代碼';
   updateAuthNotice_();
+}
+function markAuthNeedsReentry_(){
+  if(authNeedsReentry_) return;
+  const t = getAccessToken_();
+  if(!t){ setAuthNeeded_(); return; }
+  if(authVerifyInFlight_) return;
+  authVerifyInFlight_ = verifyTokenRaw_(t).then(r=>{
+    authVerifyInFlight_ = null;
+    if(r === 'bad' && t === getAccessToken_()) setAuthNeeded_();
+  });
 }
 // 狀態列與紅色提示列的「輸入代碼」小按鈕：不跳框、不擋操作，店員方便時自己點
 function updateAuthNotice_(){
@@ -1103,9 +1117,13 @@ function saveDB(){
 let lastSyncErrorReason_ = '';
 function friendlySyncReason_(res, err){
   const msg = String((res && (res.error||res.message)) || (err && err.message) || '');
+  // 2026-10-21：雲端處理太久時，回來的是一張錯誤網頁、不是資料，瀏覽器的錯誤訊息裡剛好有英文字「token」，
+  // 以前被誤判成「代碼不正確」，害店員一直被叫去輸入代碼。這種情況其實資料多半已經存進去了。
+  if(/Unexpected token|not valid JSON|<!DOCTYPE|JSON\.parse|SyntaxError/i.test(msg)) return '雲端回應較慢，資料已存在手機，會自動確認';
+  if(res && res.needAuth) return '這台裝置需要重新輸入店家代碼';
   if(/資料量|50000|50,000|上限|limit/i.test(msg)) return '雲端資料量已達上限，請聯絡維護人員';
   if(/lock|忙線|busy|逾時|timeout/i.test(msg)) return '雲端忙線中，稍後會自動重試';
-  if(/auth|權限|代碼|token|unauthor/i.test(msg)) return '代碼不正確或已失效';
+  if(/存取代碼|\(auth\)|unauthor/i.test(msg)) return '這台裝置需要重新輸入店家代碼';
   if(err) return '網路不穩或已離線，連線後會自動補送';
   return msg ? '雲端回報異常，稍後會自動重試' : '原因不明，稍後會自動重試';
 }
@@ -1383,8 +1401,10 @@ function pullFromCloud(showMsg){
   if(!url){ if(showMsg) showToast('尚未設定雲端網址'); return Promise.resolve(); }
   setSyncStatus('syncing');
   const tokenUsed_ = getAccessToken_();
+  const pullStartISO_ = nowISO();
   return fetch(url).then(r=>r.json()).then(res=>{
-    if(res && res.needAuth && tokenUsed_ === getAccessToken_()) markAuthNeedsReentry_();
+    lastPullNeedAuth_ = !!(res && res.needAuth && tokenUsed_ === getAccessToken_());
+    if(lastPullNeedAuth_) markAuthNeedsReentry_();
     if(res && res.ok && res.data){
       try{
         const remote = JSON.parse(res.data);
@@ -1401,6 +1421,9 @@ function pullFromCloud(showMsg){
           // 本機沒有待送出的異動，單純拿雲端最新狀態為準（例如全新裝置第一次打開，
           // 這裡直接整包覆蓋，避免內建示範資料殘留跟真實資料混在一起）。
           db = remote;
+          // 2026-10-21：手機資料＝雲端資料，記下這個時間點。之後送出只送「這之後有變動」的部分。
+          // 以前新裝置（或LINE／Safari各自的空間）第一次送出會把整包資料（200多KB）全送，雲端要處理很久。
+          setLastSyncedAt(pullStartISO_);
         }
         normalizeDbShape(); // 雲端資料可能是還沒升級過的舊格式，缺deletedItemIds等新欄位的話下面migrate系列會直接壞掉，這裡先補齊
         sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 雲端資料可能是舊裝置整包蓋上去、沒排序過的，這裡重新排序，避免「最近幾筆」的畫面顯示錯亂
@@ -3576,7 +3599,7 @@ async function initApp(){
     // 2026-10-20：代碼只在這裡（開門、登入之前）問。已綁定的裝置完全不問。
     await ensureAccessTokenAtEntry_();
     await pullFromCloud(false); // 等雲端資料真的到齊，登入驗證才會用到最新帳號清單
-    if(authNeedsReentry_){
+    if(lastPullNeedAuth_ && (await verifyTokenRaw_(getAccessToken_())) === 'bad'){
       // 開門時才發現這台裝置記住的代碼已經失效（例如店長換了代碼）→ 這時候還在門口，問一次是合理的
       setAccessToken_('');
       await promptTokenAtEntry_(false);
