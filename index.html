@@ -229,6 +229,19 @@ body.readonly .readonly-badge{display:inline-block;}
 .tabbar .tab .ic{font-size:32px;line-height:1;}
 .tabbar .tab.on{color:var(--brand);font-weight:700;}
 
+/* 2026-10-28：盤存總金額 */
+.stock-month-row{display:flex;align-items:center;gap:10px;margin:0 0 12px;}
+.stock-month-row label{font-size:14px;color:var(--gray);font-weight:600;}
+.stock-month-row input{flex:1;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:16px;background:var(--card);}
+.stock-summary{background:linear-gradient(145deg,#2A201C,#17100E);color:#FBF3E8;border-radius:22px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 4px rgba(40,25,18,.06),0 16px 32px -10px rgba(40,25,18,.22);}
+.stock-summary .ss-label{font-size:14px;color:#D9CBBE;letter-spacing:.06em;}
+.stock-summary .ss-total{font-size:28px;font-weight:800;color:#E8C886;font-variant-numeric:tabular-nums;margin:2px 0;}
+.stock-summary .ss-note{font-size:12px;color:#B9AA9E;}
+.stock-summary details{margin-top:10px;}
+.stock-summary summary{font-size:14px;color:#F1D59A;cursor:pointer;}
+.stock-summary .ss-row{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.12);font-variant-numeric:tabular-nums;}
+.stock-value{font-size:13px;color:var(--gray);margin-top:8px;font-variant-numeric:tabular-nums;}
+.stock-value b{color:var(--ink);}
 /* 2026-10-20：送出後被打斷、之後才確認送達的單，用這條「不擋操作」的提示列讓店員自己點開清單 */
 .pending-share-bar{display:none;position:fixed;left:12px;right:12px;bottom:96px;z-index:60;background:#06C755;color:#fff;
   border-radius:14px;padding:12px 14px;font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.2);
@@ -289,6 +302,99 @@ body.readonly .readonly-badge{display:inline-block;}
 .admin-group.risk summary{background:#FBEFDC;}
 .admin-group.risk summary .grp-label{color:var(--brand-dark);}
 </style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap&text=%E7%87%92%E9%85%92%E7%83%A4%E7%83%A4%E8%B1%AC%E5%8F%AB%E8%B2%A8%E7%B3%BB%E7%B5%B1%E9%81%B8%E6%93%87%E4%BE%9B%E6%87%89%E5%95%86%E6%94%B6%E8%B2%A8%E5%B0%8D%E5%B8%B3%E5%BA%AB%E5%AD%98%E7%9B%A4%E9%BB%9E%E7%AE%A1%E7%90%86%E7%A2%BA%E8%AA%8D%E7%B5%90%E5%B8%B3%E5%93%81%E9%A0%85%E6%B8%85%E5%96%AE%E8%BF%91%E6%9C%9F%E5%B7%B2%E5%AE%8C%E6%88%90%E9%80%99%E7%AD%86%E8%A8%82%E5%96%AE%E5%AF%A6%E6%94%B6%E7%B8%BD%E9%A1%8D%E7%B6%A6%E7%9B%9B%E8%99%9F%E8%8F%9C%E5%95%86%E5%9C%8B%E8%B1%90%E5%95%86%E8%A1%8C%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%E5%AF%B6%E5%BC%B7%E9%9F%93%E6%BF%9F%E5%90%8D%E5%91%B3%E5%93%81%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%E9%A3%9F%E6%9D%90%E4%BD%A9%E6%A3%AE%E8%82%89%E8%88%96%E6%BA%90%E9%AE%AE%E8%BE%B2%E6%A5%AD%E5%B0%9A%E8%AA%A0%E5%9C%8B%E9%9A%9B">
+<style id="skin-v2-rounded">
+/* ===== 2026-10-28 外觀升級 v2「圓潤質感版」（Barbara 指定：膠囊按鈕、大圓角、浮起陰影；按鈕位置與流程不變）：膠囊按鈕、大圓角、浮起陰影；按鈕位置與流程不變 ===== */
+:root{--ink:#231B17;--paper:#F5EEE4;--card:#FFFCF8;--tile:#F8F2EA;--line:#E9DFD2;
+ --brand:#C0391F;--brand-dark:#93260F;--gold:#C9A35C;--gold-soft:#F5EAD4;
+ --charcoal:#1D1614;--gray:#6E6159;--ok:#2F6B3E;
+ --lift:0 1px 2px rgba(40,25,18,.05),0 8px 20px -6px rgba(40,25,18,.14);
+ --lift-lg:0 2px 4px rgba(40,25,18,.06),0 16px 32px -10px rgba(40,25,18,.22);
+ --ember-glow:0 10px 22px -8px rgba(192,57,31,.6),inset 0 1px 0 rgba(255,255,255,.22);
+ --serif:"Noto Serif TC","Noto Serif CJK TC","Songti TC",serif;}
+::selection{background:#F3D2C4;color:var(--ink);}
+html,body{caret-color:var(--brand);}
+body{background:var(--paper);background-image:none;padding-bottom:120px;}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;border-color:var(--brand)!important;}
+/* 頂部：深炭、下緣圓角 */
+.topbar{background:linear-gradient(180deg,#261C19,#17100E);border-radius:0 0 26px 26px;padding:16px 18px 18px;box-shadow:0 10px 24px -12px rgba(0,0,0,.45);}
+.topbar h1{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.06em;color:#FBF3E8;}
+.topbar .sub{color:var(--gold);font-size:13px;letter-spacing:.3em;font-weight:700;}
+#loggedInLabel{color:#E9DFD3!important;}
+#loggedInBar button{background:rgba(255,255,255,.08)!important;border:1px solid rgba(201,163,92,.55)!important;color:#EBD9B4!important;border-radius:999px!important;padding:8px 16px!important;}
+.sync-line{font-size:12px;margin:14px 0 6px;}
+.page-title{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;color:var(--ink);margin:6px 2px 16px;}
+.page-title .cnt{font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;font-size:13px;font-weight:600;color:var(--gray);background:var(--gold-soft);padding:3px 10px;border-radius:999px;letter-spacing:0;}
+/* 新增供應商：膠囊輸入＋膠囊按鈕 */
+.add-supplier-top{border:none;background:var(--card);border-radius:999px;padding:6px;box-shadow:var(--lift);margin-bottom:18px;}
+.add-supplier-top input{border:none!important;background:transparent;border-radius:999px;padding:12px 14px;}
+.add-supplier-top button{border-radius:999px;padding:12px 22px;background:var(--brand);box-shadow:var(--ember-glow);}
+/* 供應商卡片：大圓角、無邊框、浮起；左圓形字標、右圓形箭頭鈕 */
+.supplier-card{border:none;border-radius:24px;background:var(--card);box-shadow:var(--lift);padding:12px 12px 12px 12px;margin-bottom:12px;}
+.supplier-card:active{transform:scale(.98);box-shadow:var(--lift-lg);}
+.supplier-card .name{font-size:17px;font-weight:700;min-width:0;overflow-wrap:anywhere;line-height:1.35;}
+.supplier-card > .left:first-child{flex:1;min-width:0;flex-wrap:wrap;row-gap:4px;}
+.supplier-card > .left:first-child .sup-mono{margin-right:2px;}
+.supplier-card > .left:last-child{flex-shrink:0;margin-left:8px;}
+.supplier-card .star,.supplier-card .badge-in{white-space:nowrap;}
+.back-btn,.quick-reorder-btn{border-radius:999px!important;border:none!important;box-shadow:var(--lift);}
+.back-btn{background:var(--card)!important;}
+.quick-reorder-btn{background:linear-gradient(145deg,#D9B56E,#A7813C)!important;color:#2A1D0E!important;}
+.sticky-tools{background:var(--paper)!important;}
+.sync-line{min-height:30px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;}
+.update-pill{display:none;margin-left:6px;border:none;border-radius:999px;background:var(--charcoal);color:#F1D59A;font-size:13px;font-weight:700;padding:5px 12px;box-shadow:0 4px 10px -3px rgba(0,0,0,.35);}
+.update-pill.show{display:inline-flex;align-items:center;gap:4px;}
+.sup-mono{width:44px;height:44px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+ font-family:var(--serif);font-weight:900;font-size:19px;color:#FBF3E8;background:linear-gradient(145deg,#3A2B25,#1D1614);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 10px -3px rgba(0,0,0,.35);}
+.supplier-card:nth-child(3n+2) .sup-mono{background:linear-gradient(145deg,#D2492C,#93260F);}
+.supplier-card:nth-child(3n) .sup-mono{background:linear-gradient(145deg,#D9B56E,#A7813C);color:#2A1D0E;}
+.supplier-card .star{background:var(--gold-soft);color:#7A5A22;border-radius:999px;font-size:12px;padding:4px 10px;}
+.supplier-card .badge-in{border-radius:999px;box-shadow:0 4px 10px -3px rgba(192,57,31,.5);}
+.supplier-card .chev{color:transparent;width:38px;height:38px;border-radius:50%;display:inline-block;background:var(--charcoal) no-repeat center/18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h13M13 6l6 6-6 6'/%3E%3C/svg%3E");box-shadow:0 6px 12px -4px rgba(0,0,0,.35);}
+/* 品項清單：圓角卡片＋「－ 數量 ＋」 */
+.item-row{border:none;border-radius:22px;background:var(--card);box-shadow:var(--lift);padding:14px 14px 14px 16px;}
+.item-row.checked{background:#FFF6F2;box-shadow:0 0 0 2px rgba(192,57,31,.35),var(--lift);}
+.item-price-row input{border-radius:999px!important;border:1px solid var(--line)!important;background:var(--tile);}
+.qty-stepper{display:inline-flex;align-items:center;gap:4px;background:var(--tile);border-radius:999px;padding:4px;box-shadow:inset 0 1px 2px rgba(40,25,18,.08);}
+.qty-stepper button{width:36px;height:36px;border-radius:50%;border:none;font-size:22px;line-height:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+.qty-stepper .st-minus{background:#fff;color:var(--ink);box-shadow:0 2px 6px -2px rgba(40,25,18,.3);}
+.qty-stepper .st-plus{background:var(--brand);color:#fff;box-shadow:var(--ember-glow);}
+.qty-stepper .qty-input{width:52px!important;height:36px!important;border:none!important;background:transparent!important;font-size:18px;font-weight:800;}
+/* 收貨：大圓角卡片、品項小磚、膠囊輸入、深色總額塊 */
+.card,.order-card,.supplier-block,.stock-row{border:none;border-radius:24px;background:var(--card);box-shadow:var(--lift);}
+#receiveList .card{padding:18px 16px;}
+#receiveList .card > div:first-child{font-family:var(--serif);font-weight:900;font-size:22px;letter-spacing:.04em;margin-bottom:6px!important;}
+.recv-item{background:var(--tile);border:none!important;border-radius:18px;padding:12px 12px 10px!important;margin-bottom:10px;}
+.recv-item > span:first-child{font-weight:700;color:var(--ink);}
+.recv-item input{border:none!important;background:#fff;border-radius:999px!important;height:42px;font-size:17px!important;font-weight:700;box-shadow:inset 0 1px 2px rgba(40,25,18,.1),0 1px 0 rgba(255,255,255,.8);}
+#receiveList .card > div[style*="border-top:2px"]{background:linear-gradient(145deg,#2A201C,#17100E);color:#FBF3E8;border:none!important;border-radius:20px;padding:16px 18px!important;margin-top:14px!important;box-shadow:var(--lift-lg);}
+#receiveList .card > div[style*="border-top:2px"] span:last-child{color:#E8C886;font-size:20px;}
+.all-ok-btn{border-radius:999px;background:var(--gold-soft);color:#5C4418;border:none;padding:15px;box-shadow:inset 0 0 0 1px rgba(201,163,92,.55);}
+.confirm-recv-btn,.confirm-btn{border-radius:999px;background:var(--brand);box-shadow:var(--ember-glow);padding:17px;letter-spacing:.06em;}
+.icon-btn{border-radius:999px!important;border:none!important;background:var(--card)!important;box-shadow:var(--lift);}
+.status-pill{border-radius:999px;}
+.status-sent{background:var(--gold-soft);color:#7A5A22;}
+.recv-tap{display:inline-block;float:right;background:var(--charcoal);color:#fff;border-radius:999px;padding:8px 16px;font-size:14px;}
+/* 結帳列：懸浮深炭膠囊 */
+.checkout-bar{left:12px;right:12px;bottom:96px;border-radius:24px;background:linear-gradient(145deg,#2A201C,#17100E);box-shadow:var(--lift-lg);border:none;}
+.checkout-bar button{border-radius:999px;background:var(--brand);box-shadow:var(--ember-glow);}
+/* 底部分頁：懸浮圓角條，選到的分頁有圓形底 */
+.tabbar{left:12px;right:12px;bottom:12px;border-radius:28px;background:#17100E;border:none;box-shadow:0 14px 30px -10px rgba(0,0,0,.55);padding:6px 4px;}
+.tabbar .tab{color:#A3958B;font-size:14px;font-weight:600;padding:6px 0;gap:3px;}
+.tabbar .tab .ic{font-size:0;width:44px;height:30px;border-radius:999px;background:currentColor;-webkit-mask:no-repeat center/24px;mask:no-repeat center/24px;}
+.tabbar .tab.on{color:#F1D59A;}
+.tabbar .tab.on .ic{background:#F1D59A;}
+.tabbar .tab.on{background:radial-gradient(closest-side,rgba(241,213,154,.14),transparent);}
+.tabbar .tab[data-tab="order"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4' width='14' height='17' rx='3'/%3E%3Cpath d='M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4' width='14' height='17' rx='3'/%3E%3Cpath d='M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="receive"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16z'/%3E%3Cpath d='M3.5 8 12 12.5 20.5 8M12 12.5v8'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16z'/%3E%3Cpath d='M3.5 8 12 12.5 20.5 8M12 12.5v8'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="stock"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 20V11M12 20V5M17 20v-6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 20V11M12 20V5M17 20v-6'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="admin"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7'/%3E%3C/svg%3E");}
+.toast{background:#1D1614;border-radius:999px;}
+.mini-field input{border-radius:999px!important;border:1px solid var(--line)!important;background:var(--tile)!important;padding:11px 14px!important;}
+.order-card{padding:16px!important;}
+.sync-success-banner{background:#1F3A27;}
+</style>
 </head>
 <body>
 
@@ -309,7 +415,7 @@ body.readonly .readonly-badge{display:inline-block;}
   <button id="pendingSyncBtn" onclick="pendingBannerAction_()">立即重試</button>
 </div>
 <div class="sync-success-banner" id="syncSuccessBanner"></div>
-<div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span><span id="tokenFixLink" class="token-fix-link" style="display:none;" onclick="openTokenModalByUser_()">輸入代碼</span><span id="verText" style="margin-left:8px;font-size:10px;color:var(--gray);opacity:.8;"></span></div>
+<div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span><span id="tokenFixLink" class="token-fix-link" style="display:none;" onclick="openTokenModalByUser_()">輸入代碼</span><span id="verText" style="margin-left:8px;font-size:10px;color:var(--gray);opacity:.8;"></span><button type="button" class="update-pill" id="updatePill" onclick="applyUpdate_()">↻ 有新版本，點這裡更新</button></div>
 
 <!-- ============ 登入畫面 ============ -->
 <div class="modal-mask show" id="loginGate" style="align-items:center;z-index:300;">
@@ -397,6 +503,8 @@ body.readonly .readonly-badge{display:inline-block;}
 <!-- ============ 頁面5：庫存盤點 ============ -->
 <section class="page" id="page-stock">
   <div class="page-title">庫存盤點 <span class="cnt">改完自動儲存，不用另外按存檔</span></div>
+  <div class="stock-month-row"><label for="stockMonth">盤點月份</label><input type="month" id="stockMonth" onchange="setStockMonth_(this.value)"></div>
+  <div id="stockSummary"></div>
   <div class="stock-filter" id="stockFilter"></div>
   <div id="stockList"></div>
 </section>
@@ -911,7 +1019,7 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
-const APP_VERSION = '2026.10.21-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+const APP_VERSION = '2026.10.28-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
 document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
 // ===== 2026-10-14新增：雲端存取代碼 =====
@@ -2014,7 +2122,7 @@ function renderSupplierList(){
     const inCart = db.cart[s.id] ? Object.keys(db.cart[s.id]).length : 0;
     const star = idx<3 ? '<span class="star">常用</span>' : '';
     return `<div class="supplier-card" onclick="openSupplier('${s.id}')">
-      <div class="left"><span class="name">${escapeHtml(s.name)}</span>${star}</div>
+      <div class="left"><span class="sup-mono" aria-hidden="true">${escapeHtml(String(s.name||'').trim().charAt(0))}</span><span class="name">${escapeHtml(s.name)}</span>${star}</div>
       <div class="left">${inCart? `<span class="badge-in">已選 ${inCart} 項</span>`:''}<span class="chev">›</span></div>
     </div>`;
   }).join('');
@@ -2081,13 +2189,25 @@ function renderItemList(){
         </div>
       </div>
       <div class="item-controls">
-        <span style="font-size:12px;color:var(--gray);">數量</span>
-        <input type="number" step="any" min="0" class="qty-input" value="${qty||''}" placeholder="0"
-          onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
+        <span class="qty-stepper">
+          <button type="button" class="st-minus" aria-label="減少數量" onclick="stepQty_('${sid}','${it.id}',-1)" ${isReadonly()?'disabled':''}>−</button>
+          <input type="number" step="any" min="0" inputmode="decimal" class="qty-input" value="${qty||''}" placeholder="0"
+            onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
+          <button type="button" class="st-plus" aria-label="增加數量" onclick="stepQty_('${sid}','${it.id}',1)" ${isReadonly()?'disabled':''}>+</button>
+        </span>
         <span style="font-size:12px;color:var(--gray);">${escapeHtml(it.unit)}</span>
       </div>
     </div>`;
   }).join('');
+}
+// 2026-10-28：數量旁的「－ ＋」按鈕（Barbara 指定）：一次加減1，最少到0；一樣可以直接打字（例如 0.5 斤）
+function stepQty_(sid, itemId, d){
+  if(isReadonly()) return;
+  const cur = (db.cart[sid] && db.cart[sid][itemId]) || 0;
+  const next = Math.max(0, Math.round((cur + d) * 100) / 100);
+  setQtyDirect(sid, itemId, next);
+  const inp = document.querySelector('#row-'+itemId+' .qty-input');
+  if(inp) inp.value = next || '';
 }
 function setQtyDirect(sid, itemId, val){
   if(isReadonly()) return;
@@ -3001,6 +3121,7 @@ function confirmReceive(orderId, opts){
   o.receivedTotal = money(received.reduce((s,r)=>s+r.actualQty*r.actualPrice,0));
   o.status='done';
   o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
+  o.completedAtISO = nowISO(); // 2026-10-28：盤存月均價依「實際收貨月份」計算用
   o.updatedAt = nowISO();
   // 2026-10-01新增：記收貨確認人帳號，理由同下單人——後台報表要直接看得到「誰收的貨」。
   o.receivedByAccount = currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入';
@@ -3082,11 +3203,79 @@ function autoUpdatePricesFromReceive_(o, received, skipItemIds){
 }
 
 /* ---------- 庫存盤點 ---------- */
+/* 2026-10-28（最初目標：「系統依當月平均叫貨單價，自動算出當月盤存總金額」）
+   規則（Barbara 確認）：
+   - 盤存金額 ＝ 盤點數量 × 當月平均單價
+   - 當月平均單價 ＝ 當月「已收貨」的實收總金額 ÷ 實收總數量（加權平均，退貨負數也算進去）
+   - 當月沒進貨：用最近一次有進貨那個月的平均單價；從沒進過貨：用品項目前單價
+   - 盤點數量按月份留存（item.stockByMonth），當月的數字也同步寫回 item.stockQty（相容舊畫面） */
 let stockFilterSupplier = 'all';
+function monthKeyNow_(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthKeyOfISO_(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function orderReceiveMonth_(o){
+  if(o.completedAtISO) return monthKeyOfISO_(o.completedAtISO);
+  if(o.deliveryDate && /^\d{4}-\d{2}/.test(o.deliveryDate)) return o.deliveryDate.slice(0,7);
+  return monthKeyOfISO_(o.updatedAt || o.createdAtISO);
+}
+// 每個品項、每個月份的實收合計 {itemId:{'2026-10':{amt,qty}}}
+function buildPurchaseStats_(){
+  const st = {};
+  (db.orders||[]).forEach(o=>{
+    if(o.status!=='done' || !Array.isArray(o.received)) return;
+    const mk = orderReceiveMonth_(o); if(!mk) return;
+    o.received.forEach((r,idx)=>{
+      const it = (o.items||[])[idx]; if(!it || !it.itemId || !r) return;
+      const q = Number(r.actualQty)||0, p = Number(r.actualPrice)||0;
+      if(!q) return;
+      const a = st[it.itemId] || (st[it.itemId] = {});
+      const m = a[mk] || (a[mk] = {amt:0, qty:0});
+      m.amt += q*p; m.qty += q;
+    });
+  });
+  return st;
+}
+// 回傳 {price, src}，src：'month'（本月加權平均）| 'prev'（沿用最近有進貨月份，附月份）| 'item'（品項單價）| 'none'
+function avgPriceFor_(item, month, stats){
+  const byM = stats[item.id] || {};
+  const cur = byM[month];
+  if(cur && cur.qty > 0) return {price: money(cur.amt/cur.qty), src:'month'};
+  const earlier = Object.keys(byM).filter(k=>k < month && byM[k].qty > 0).sort();
+  if(earlier.length){ const k = earlier[earlier.length-1]; return {price: money(byM[k].amt/byM[k].qty), src:'prev', from:k}; }
+  const p = Number(item.price)||0;
+  return p > 0 ? {price:p, src:'item'} : {price:0, src:'none'};
+}
+function stockQtyFor_(item, month){
+  const m = item.stockByMonth && item.stockByMonth[month];
+  if(m !== undefined && m !== null && m !== '') return Number(m)||0;
+  if(month === monthKeyNow_()) return Number(item.stockQty)||0;
+  return 0;
+}
+function setStockMonth_(v){ state.stockMonth = v || monthKeyNow_(); renderStock(); }
 function renderStock(){
+  if(!state.stockMonth) state.stockMonth = monthKeyNow_();
+  const month = state.stockMonth;
+  const monthInput = document.getElementById('stockMonth');
+  if(monthInput){ monthInput.value = month; monthInput.max = monthKeyNow_(); }
   const filterWrap = document.getElementById('stockFilter');
   filterWrap.innerHTML = `<button class="${stockFilterSupplier==='all'?'on':''}" onclick="setStockFilter('all')">全部</button>` +
     db.suppliers.map(s=>`<button class="${stockFilterSupplier===s.id?'on':''}" onclick="setStockFilter('${s.id}')">${escapeHtml(s.name)}</button>`).join('');
+  const stats = buildPurchaseStats_();
+  // 本月盤存總額＋各供應商小計（總額永遠算全部品項，不受下方篩選影響）
+  let grand = 0; const bySup = {};
+  db.items.forEach(it=>{
+    const q = stockQtyFor_(it, month); if(!q) return;
+    const v = money(q * avgPriceFor_(it, month, stats).price);
+    grand += v; bySup[it.supplierId] = (bySup[it.supplierId]||0) + v;
+  });
+  const [yy, mm] = month.split('-');
+  const supRows = db.suppliers.filter(s=>bySup[s.id]).sort((a,b)=>bySup[b.id]-bySup[a.id])
+    .map(s=>`<div class="ss-row"><span>${escapeHtml(s.name)}</span><span>NTD ${money(bySup[s.id]).toLocaleString()}</span></div>`).join('');
+  document.getElementById('stockSummary').innerHTML = `<div class="stock-summary">
+      <div class="ss-label">${yy}年${Number(mm)}月 盤存總金額</div>
+      <div class="ss-total">NTD ${money(grand).toLocaleString()}</div>
+      <div class="ss-note">盤點數量 × 當月平均進貨單價（實收加權平均）</div>
+      ${supRows ? `<details class="ss-detail"><summary>依供應商看小計</summary>${supRows}</details>` : '<div class="ss-note">這個月還沒有輸入盤點數量</div>'}
+    </div>`;
   const wrap = document.getElementById('stockList');
   const items = db.items.filter(i=> stockFilterSupplier==='all' || i.supplierId===stockFilterSupplier)
     .sort((a,b)=> a.supplierId===b.supplierId ? (a.sortIndex||0)-(b.sortIndex||0) : String(a.supplierId||'').localeCompare(String(b.supplierId||'')));
@@ -3094,15 +3283,19 @@ function renderStock(){
   wrap.innerHTML = items.map(it=>{
     const s = db.suppliers.find(x=>x.id===it.supplierId);
     const myLogs = db.priceLog.filter(l=>l.itemId===it.id);
+    const q = stockQtyFor_(it, month);
+    const ap = avgPriceFor_(it, month, stats);
+    const srcTxt = ap.src==='month' ? '本月實收加權平均' : ap.src==='prev' ? `沿用 ${Number(ap.from.slice(5))} 月平均` : ap.src==='item' ? '本月沒進貨，用品項單價' : '尚無單價';
     return `<div class="stock-row">
       <div class="top"><div><div class="name">${escapeHtml(it.name)}</div>
       <div class="meta">${escapeHtml(it.code||'—')} · ${escapeHtml(s?.name||'')}</div></div></div>
       <div class="grid2">
         <div class="mini-field"><label>單價 NTD／${escapeHtml(it.unit)}</label>
           <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
-        <div class="mini-field"><label>結餘（盤點數量）</label>
-          <input type="number" step="any" value="${it.stockQty||0}" ${isReadonly()?'disabled':''} onchange="updateStockQty('${it.id}', this.value); showSaved('${it.id}')"></div>
+        <div class="mini-field"><label>${Number(month.slice(5))}月結餘（盤點數量）</label>
+          <input type="number" step="any" value="${q||''}" placeholder="0" ${isReadonly()?'disabled':''} onchange="updateStockQty('${it.id}', this.value); showSaved('${it.id}')"></div>
       </div>
+      <div class="stock-value" id="sv-${it.id}">${q ? `${q} × NTD ${ap.price}（${srcTxt}）＝ <b>NTD ${money(q*ap.price).toLocaleString()}</b>` : `平均單價 NTD ${ap.price}（${srcTxt}）`}</div>
       <div id="saved-${it.id}" style="font-size:11px;color:var(--ok);margin-top:4px;height:14px;"></div>
       ${myLogs.length? `<div class="price-changed-tag" onclick="toggleItemHistory('${it.id}')" style="cursor:pointer;">📜 這個品項有 ${myLogs.length} 筆異動紀錄，點這裡查看 ›</div>
       <div id="hist-${it.id}" style="display:none;margin-top:8px;background:var(--gray-bg);border-radius:10px;padding:8px 10px;">
@@ -3125,9 +3318,21 @@ function setStockFilter(id){ stockFilterSupplier=id; renderStock(); }
 function updateStockQty(itemId, val){
   if(isReadonly()) return; // 唯讀身份不可修改盤點數量（欄位已disabled，這裡再擋一次避免被繞過）
   const item = db.items.find(i=>i.id===itemId);
-  item.stockQty = parseFloat(val)||0;
+  if(!item) return;
+  const month = state.stockMonth || monthKeyNow_();
+  const q = parseFloat(val)||0;
+  if(!item.stockByMonth || typeof item.stockByMonth!=='object') item.stockByMonth = {};
+  item.stockByMonth[month] = q;
+  if(month === monthKeyNow_()) item.stockQty = q; // 當月的數字同步寫回（相容舊畫面）
   item.updatedAt = nowISO();
   saveDB();
+  // 只更新這一格的金額和最上方總額，不重畫整個清單（正在輸入下一格的不會被洗掉）
+  const stats = buildPurchaseStats_(); const ap = avgPriceFor_(item, month, stats);
+  const el = document.getElementById('sv-'+itemId);
+  if(el) el.innerHTML = q ? `${q} × NTD ${ap.price} ＝ <b>NTD ${money(q*ap.price).toLocaleString()}</b>` : `平均單價 NTD ${ap.price}`;
+  const sum = document.getElementById('stockSummary');
+  if(sum){ let grand=0; db.items.forEach(it=>{ const qq=stockQtyFor_(it, month); if(qq) grand += money(qq*avgPriceFor_(it, month, stats).price); });
+    const t = sum.querySelector('.ss-total'); if(t) t.textContent = 'NTD ' + money(grand).toLocaleString(); }
 }
 
 /* ---------- 供應商管理 + 異動紀錄 ---------- */
@@ -3618,6 +3823,39 @@ async function initApp(){
   renderLicenseGate();
 }
 initApp();
+
+/* ---------- 2026-10-28 新版本提示 ----------
+   10/28 事故：店員手機一直開著更新前的舊畫面，送出後等不到確認、出不了 LINE 清單。
+   現在：每5分鐘、以及從別的App切回來時，自己檢查網站上的版本；有新版就在狀態列出現
+   「有新版本，點這裡更新」小按鈕，不跳視窗、不打斷，店員方便時點一下。
+   更新前會先試著把手機上還沒送出的資料送出；資料本來就存在手機，重新整理也不會不見。 */
+let newVersionAvailable_ = '';
+async function checkForNewVersion_(){
+  try{
+    const base = location.href.split('#')[0].split('?')[0];
+    const t = await fetch(base + '?vcheck=' + Date.now(), {cache:'no-store'}).then(r=>r.ok ? r.text() : '');
+    const m = t && t.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1] && m[1] !== APP_VERSION){ newVersionAvailable_ = m[1]; }
+  }catch(e){}
+  renderUpdatePill_();
+}
+function renderUpdatePill_(){
+  const p = document.getElementById('updatePill');
+  if(p) p.classList.toggle('show', !!newVersionAvailable_);
+}
+async function applyUpdate_(){
+  const p = document.getElementById('updatePill');
+  if(p){ p.disabled = true; p.textContent = '更新中，請稍候…'; }
+  let pending = false;
+  try{ pending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  if(pending && getGasUrl() && !cloudPushInFlight){
+    try{ await Promise.race([ pushOnce_(), new Promise(r=>setTimeout(r, 12000)) ]); }catch(e){}
+  }
+  location.replace(location.href.split('#')[0].split('?')[0] + '?v=' + encodeURIComponent(newVersionAvailable_ || Date.now()));
+}
+setInterval(checkForNewVersion_, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkForNewVersion_(); });
+setTimeout(checkForNewVersion_, 20000);
 
 /* ---------- 背景定期同步（縮短資料落後的時間窗，降低舊裝置蓋掉新資料的風險） ---------- */
 setInterval(()=>{
