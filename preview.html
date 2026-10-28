@@ -1,0 +1,3909 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, interactive-widget=resizes-content">
+<title id="pageTitleTag">燒酒烤烤豬｜叫貨系統</title>
+<link rel="icon" id="faviconLink" href="data:,">
+<style>
+:root{
+  --ink:#2A2320;
+  --paper:#FBF6EF;
+  --card:#FFFFFF;
+  --line:#E7DCCB;
+  --brand:#B5482E;      /* 炭烤炙紅 */
+  --brand-dark:#7F2E1C;
+  --amber:#C98A2C;       /* 醬燒琥珀 */
+  --charcoal:#2A2320;
+  --gray:#8A8078;
+  --gray-bg:#F1EAE0;
+  --ok:#3E7D4C;
+  --warn:#B5482E;
+  --radius:14px;
+  --radius-sm:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;color:var(--ink);font-size:16px;line-height:1.5;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;}
+body{
+  padding-bottom:86px;min-height:100vh;
+  background-color:var(--paper);
+  background-image:
+    radial-gradient(circle at 3px 3px, rgba(181,72,46,.07) 1.6px, transparent 1.6px),
+    radial-gradient(circle at 13px 13px, rgba(201,138,44,.06) 1.2px, transparent 1.2px);
+  background-size:26px 26px, 26px 26px;
+  background-attachment:fixed;
+}
+button{font-family:inherit;}
+input,select{font-family:inherit;}
+
+/* ---------- 頂部列 ---------- */
+.topbar{position:sticky;top:0;z-index:20;background:var(--charcoal);color:#fff;
+  padding:14px 16px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 8px rgba(0,0,0,.15);}
+.topbar h1{font-size:24px;font-weight:700;margin:0;letter-spacing:.5px;}
+.topbar .sub{font-size:15px;color:#D8CFC4;margin-top:3px;font-weight:500;}
+.role-pick{display:flex;align-items:center;gap:6px;}
+.role-pick select{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);
+  border-radius:8px;padding:8px 10px;font-size:14px;max-width:120px;}
+.role-pick select option{color:#111;}
+.readonly-badge{display:none;background:var(--amber);color:#fff;font-size:12px;font-weight:700;
+  padding:3px 8px;border-radius:20px;margin-left:6px;}
+body.readonly .readonly-badge{display:inline-block;}
+
+/* ---------- 頁面容器 ---------- */
+.page{display:none;padding:16px;max-width:560px;margin:0 auto;}
+.page.active{display:block;}
+.page-title{font-size:19px;font-weight:700;margin:0 0 14px;color:var(--charcoal);
+  display:flex;align-items:center;gap:8px;}
+.page-title .cnt{font-size:13px;font-weight:500;color:var(--gray);}
+
+/* ---------- 卡片通用 ---------- */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px;margin-bottom:10px;}
+.card.tap{cursor:pointer;transition:transform .08s;}
+.card.tap:active{transform:scale(.985);}
+.empty{text-align:center;color:var(--gray);font-size:16px;padding:40px 20px;}
+
+/* ---------- 供應商卡片 ---------- */
+.supplier-card{display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:8px;cursor:pointer;}
+.supplier-card:active{transform:scale(.985);}
+.supplier-card .left{display:flex;align-items:center;gap:10px;}
+.supplier-card .name{font-size:18px;font-weight:600;}
+.supplier-card .star{color:var(--amber);font-size:14px;background:#FBEFDC;padding:4px 9px;
+  border-radius:20px;font-weight:700;}
+.supplier-card .badge-in{background:var(--brand);color:#fff;font-size:13px;font-weight:700;
+  padding:3px 9px;border-radius:20px;}
+.supplier-card .chev{color:var(--gray);}
+.add-supplier-row{display:flex;gap:8px;margin-top:10px;}
+.add-supplier-row input{flex:1;border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:13px 14px;font-size:16px;}
+/* 2026-10-18：「新增供應商」移到下單首頁最上方，虛線紅框，供應商多時不用滑到底 */
+.add-supplier-top{display:flex;gap:8px;margin:0 0 14px;padding:10px;border:2px dashed var(--brand);
+  border-radius:var(--radius);background:#FDF3EF;}
+.add-supplier-top input{flex:1;min-width:0;border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:12px 8px;font-size:16px;background:#fff;}
+.add-supplier-top input::placeholder{font-size:14px;letter-spacing:-.3px;}
+.add-supplier-top button{background:var(--brand);color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:12px 14px;font-size:16px;font-weight:700;white-space:nowrap;}
+.co-pick-row{display:flex;align-items:center;gap:10px;margin:0 0 10px;}
+.co-pick-row input{width:24px;height:24px;accent-color:var(--brand);flex:none;}
+.co-pick-row h3{margin:0 !important;}
+.supplier-block.skipped{opacity:.5;}
+.co-pick-hint{font-size:13px;color:var(--gray);margin:0 0 10px;}
+.icon-btn{border:1px solid var(--line);background:var(--card);border-radius:var(--radius-sm);
+  padding:13px 16px;font-size:15px;font-weight:600;color:var(--brand);}
+.supplier-manage-item{display:flex;justify-content:space-between;align-items:center;
+  padding:12px 4px;border-bottom:1px solid var(--line);font-size:15px;}
+.supplier-manage-item:last-child{border-bottom:none;}
+.del-x{color:var(--brand);font-weight:700;font-size:15px;padding:6px 12px;}
+
+/* ---------- 品項清單 ---------- */
+.sticky-tools{position:sticky;top:64px;z-index:15;background:var(--paper);
+  padding:8px 0 10px;display:flex;gap:8px;}
+.quick-reorder-btn{flex:1;background:var(--amber);color:#fff;border:none;border-radius:var(--radius-sm);
+  padding:13px;font-size:15px;font-weight:700;}
+.back-btn{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:13px 14px;font-size:15px;font-weight:600;color:var(--charcoal);}
+.item-row{display:flex;justify-content:space-between;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;margin-bottom:8px;}
+.item-row.checked{border-color:var(--brand);background:#FDF3EF;}
+.item-info{flex:1;min-width:0;}
+.item-code{font-size:12px;color:var(--gray);font-weight:600;}
+.item-name{font-size:18px;font-weight:600;margin:4px 0;}
+.item-price-row{display:flex;align-items:center;gap:4px;font-size:14px;color:var(--gray);}
+.item-price-row input{width:64px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;
+  font-size:14px;text-align:right;}
+.item-controls{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.chk{width:26px;height:26px;accent-color:var(--brand);}
+.qty-btn{width:36px;height:36px;border:1px solid var(--line);border-radius:9px;background:var(--card);
+  font-size:20px;font-weight:700;color:var(--brand);display:flex;align-items:center;justify-content:center;}
+.qty-val{width:34px;text-align:center;font-size:17px;font-weight:700;}
+.qty-input{width:64px;height:40px;border:2px solid var(--line);border-radius:9px;
+  font-size:17px;font-weight:700;text-align:center;color:var(--brand);background:var(--card);}
+.qty-input:focus{border-color:var(--brand);outline:none;}
+
+/* ---------- 品項方格檢視 ---------- */
+.item-grid-wrap{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.item-grid-cell{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 10px;text-align:center;}
+.item-grid-cell.checked{border-color:var(--brand);background:#FDF3EF;}
+.grid-icon{font-size:34px;line-height:1;margin-bottom:6px;}
+.grid-name{font-size:15px;font-weight:700;margin-bottom:4px;}
+.grid-price{font-size:13px;color:var(--gray);margin-bottom:8px;}
+.grid-controls{display:flex;align-items:center;justify-content:center;gap:8px;}
+
+/* ---------- 底部結帳列 ---------- */
+.checkout-bar{position:fixed;left:0;right:0;bottom:86px;background:var(--charcoal);color:#fff;
+  padding:12px 16px;display:none;justify-content:space-between;align-items:center;z-index:25;
+  box-shadow:0 -2px 10px rgba(0,0,0,.2);}
+.checkout-bar.show{display:flex;}
+.checkout-bar .info{font-size:14px;color:#D8CFC4;}
+.checkout-bar .total{font-size:19px;font-weight:700;}
+.checkout-bar button{background:var(--brand);color:#fff;border:none;padding:13px 20px;
+  border-radius:var(--radius-sm);font-size:15px;font-weight:700;}
+
+/* ---------- 結帳頁 ---------- */
+.supplier-block{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px;margin-bottom:12px;}
+.supplier-block h3{font-size:16px;margin:0 0 10px;color:var(--brand);font-weight:700;}
+.co-item{display:flex;justify-content:space-between;font-size:15px;padding:6px 0;
+  border-bottom:1px dashed var(--line);}
+.co-item:last-of-type{border-bottom:none;}
+.co-sub{display:flex;justify-content:space-between;font-size:14px;color:var(--gray);
+  margin-top:8px;padding-top:8px;border-top:1px solid var(--line);}
+.field-row{margin-bottom:10px;}
+.field-row label{font-size:14px;color:var(--gray);display:block;margin-bottom:5px;}
+.field-row input,.field-row select{width:100%;border:1px solid var(--line);border-radius:var(--radius-sm);
+  padding:13px 14px;font-size:16px;}
+.grand-total{text-align:right;font-size:19px;font-weight:700;margin:14px 0;}
+.confirm-btn{width:100%;background:var(--brand);color:#fff;border:none;border-radius:var(--radius);
+  padding:16px;font-size:18px;font-weight:700;}
+.confirm-btn:disabled{background:var(--gray);}
+
+/* ---------- 分享/成功彈窗 ---------- */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;
+  align-items:flex-end;justify-content:center;z-index:60;}
+.modal-mask.show{display:flex;}
+.modal-sheet{background:var(--paper);width:100%;max-width:560px;border-radius:20px 20px 0 0;
+  padding:20px 16px 28px;max-height:82vh;overflow-y:auto;}
+.modal-sheet h3{font-size:18px;margin:0 0 14px;}
+.line-preview{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px;font-size:15px;white-space:pre-wrap;line-height:1.7;margin-bottom:14px;
+  font-family:ui-monospace,monospace;}
+.share-row{display:flex;gap:8px;}
+.share-row button{flex:1;border:none;border-radius:var(--radius-sm);padding:14px;font-size:15px;font-weight:700;}
+.btn-line{background:#06C755;color:#fff;}
+.btn-copy{background:var(--card);border:1px solid var(--line);color:var(--charcoal);}
+.close-modal{display:block;margin:14px auto 0;background:none;border:none;color:var(--gray);font-size:15px;}
+
+/* ---------- 收貨 ---------- */
+.order-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;margin-bottom:8px;}
+.order-card .row1{display:flex;justify-content:space-between;align-items:center;}
+.order-card .oid{font-size:13px;color:var(--gray);}
+.order-card .oname{font-size:17px;font-weight:700;margin-top:3px;}
+.status-pill{font-size:13px;font-weight:700;padding:4px 11px;border-radius:20px;}
+.status-sent{background:#FBEFDC;color:var(--amber);}
+.status-done{background:#E7F2E9;color:var(--ok);}
+.recv-tap{margin-top:8px;text-align:right;font-size:15px;color:var(--brand);font-weight:700;}
+.recv-item{display:flex;justify-content:space-between;align-items:center;padding:11px 0;
+  border-bottom:1px solid var(--line);font-size:15px;}
+.recv-item:last-child{border-bottom:none;}
+.recv-item.diff .actual{color:var(--warn);font-weight:700;}
+.recv-item input{width:64px;border:1px solid var(--line);border-radius:6px;padding:6px;text-align:center;font-size:15px;}
+.all-ok-btn{width:100%;background:var(--gray-bg);color:var(--charcoal);border:none;
+  border-radius:var(--radius-sm);padding:13px;font-size:15px;font-weight:700;margin:10px 0;}
+.confirm-recv-btn{width:100%;background:var(--ok);color:#fff;border:none;border-radius:var(--radius);
+  padding:15px;font-size:17px;font-weight:700;}
+
+/* ---------- 盤點 ---------- */
+.stock-filter{display:flex;gap:8px;overflow-x:auto;padding-bottom:8px;margin-bottom:10px;}
+.stock-filter button{flex-shrink:0;border:1px solid var(--line);background:var(--card);
+  border-radius:20px;padding:9px 15px;font-size:14px;color:var(--charcoal);}
+.stock-filter button.on{background:var(--brand);color:#fff;border-color:var(--brand);}
+.stock-row{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;margin-bottom:8px;}
+.stock-row .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.stock-row .name{font-size:17px;font-weight:600;}
+.stock-row .meta{font-size:12px;color:var(--gray);}
+.stock-row .grid2{display:flex;gap:16px;}
+.mini-field{flex:1;}
+.mini-field label{font-size:12px;color:var(--gray);display:block;margin-bottom:4px;}
+.mini-field input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 9px;font-size:15px;}
+.price-changed-tag{font-size:12px;color:var(--warn);font-weight:700;margin-top:4px;}
+
+/* ---------- 供應商管理／異動紀錄 ---------- */
+.log-row{font-size:14px;color:var(--gray);padding:8px 0;border-bottom:1px solid var(--line);}
+.log-row:last-child{border-bottom:none;}
+.log-row b{color:var(--charcoal);}
+
+/* ---------- 底部導覽 ---------- */
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);
+  display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom);}
+.tabbar .tab{flex:1;text-align:center;padding:12px 0 9px;font-size:15px;color:var(--gray);
+  display:flex;flex-direction:column;align-items:center;gap:5px;border:none;background:none;}
+.tabbar .tab .ic{font-size:32px;line-height:1;}
+.tabbar .tab.on{color:var(--brand);font-weight:700;}
+
+/* 2026-10-28：盤存總金額 */
+.stock-month-row{display:flex;align-items:center;gap:10px;margin:0 0 12px;}
+.stock-month-row label{font-size:14px;color:var(--gray);font-weight:600;}
+.stock-month-row input{flex:1;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:16px;background:var(--card);}
+.stock-summary{background:linear-gradient(145deg,#2A201C,#17100E);color:#FBF3E8;border-radius:22px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 4px rgba(40,25,18,.06),0 16px 32px -10px rgba(40,25,18,.22);}
+.stock-summary .ss-label{font-size:14px;color:#D9CBBE;letter-spacing:.06em;}
+.stock-summary .ss-total{font-size:28px;font-weight:800;color:#E8C886;font-variant-numeric:tabular-nums;margin:2px 0;}
+.stock-summary .ss-note{font-size:12px;color:#B9AA9E;}
+.stock-summary details{margin-top:10px;}
+.stock-summary summary{font-size:14px;color:#F1D59A;cursor:pointer;}
+.stock-summary .ss-row{display:flex;justify-content:space-between;font-size:14px;padding:6px 0;border-bottom:1px dashed rgba(255,255,255,.12);font-variant-numeric:tabular-nums;}
+.stock-value{font-size:13px;color:var(--gray);margin-top:8px;font-variant-numeric:tabular-nums;}
+.stock-value b{color:var(--ink);}
+/* 2026-10-20：送出後被打斷、之後才確認送達的單，用這條「不擋操作」的提示列讓店員自己點開清單 */
+.pending-share-bar{display:none;position:fixed;left:12px;right:12px;bottom:96px;z-index:60;background:#06C755;color:#fff;
+  border-radius:14px;padding:12px 14px;font-size:15px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.2);
+  align-items:center;justify-content:space-between;gap:10px;}
+.pending-share-bar.show{display:flex;}
+.pending-share-bar button{background:#fff;color:#06A845;border:none;border-radius:10px;padding:9px 14px;font-size:15px;font-weight:700;white-space:nowrap;}
+.token-fix-link{margin-left:6px;color:var(--brand);font-weight:700;text-decoration:underline;cursor:pointer;}
+.price-guard-row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:15px;}
+.price-guard-btns{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+.price-guard-btns button{width:100%;padding:13px;font-size:16px;font-weight:700;border-radius:12px;border:1px solid var(--line);background:#fff;}
+.price-guard-btns .pg-update{background:var(--brand);color:#fff;border:none;}
+.recv-draft-hint{font-size:12px;color:#3E7D4C;font-weight:700;margin-bottom:8px;}
+.line-preview.selectable{user-select:text;-webkit-user-select:text;}
+.toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);background:var(--charcoal);
+  color:#fff;padding:12px 20px;border-radius:20px;font-size:15px;z-index:80;opacity:0;
+  transition:opacity .25s;pointer-events:none;}
+.toast.show{opacity:1;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;margin-right:5px;}
+.sync-dot.off{background:var(--warn);}
+.sync-line{font-size:13px;color:var(--gray);text-align:center;margin:8px 0 14px;}
+/* 2026-10-02新增：未同步強制警示列——原本只有小小一顆燈號+文字，手機上太容易被忽略，
+   導致訂單送出失敗、卡在本機一整晚都沒人發現（品饌/裕賀等5張單事故）。改成整條醒目的
+   紅色固定banner，只要PENDING_SYNC_KEY還在，不管切到哪一頁都看得到，而且用
+   position:sticky貼在最上面，不會被捲動捲走看不見。 */
+.pending-sync-banner{display:none;position:fixed;top:0;left:0;right:0;z-index:250;background:#d32f2f;color:#fff;
+  font-size:14px;font-weight:700;text-align:center;padding:10px 14px;line-height:1.5;}
+.pending-sync-banner.show{display:block;}
+.pending-sync-banner button{margin-left:8px;background:#fff;color:#d32f2f;border:none;border-radius:6px;
+  padding:6px 12px;font-size:13px;font-weight:700;}
+
+/* 2026-10-02新增：成功同步提示——之前只有失敗才有醒目紅色banner，成功只有
+   一行小字「資料已存於本機」，容易被忽略，造成「沒跳紅色=應該沒事」的消極
+   判斷方式。現在送達雲端成功後，跳一個同樣醒目、但綠色、會自動消失的提示，
+   讓使用者「確實看到」成功，不是用沉默去推論。 */
+.sync-success-banner{position:fixed;top:0;left:0;right:0;z-index:249;pointer-events:none;background:#3E7D4C;color:#fff;
+  font-size:14px;font-weight:700;text-align:center;padding:10px 14px;line-height:1.5;
+  max-height:0;overflow:hidden;opacity:0;transition:max-height .25s ease,opacity .25s ease,padding .25s ease;}
+.sync-success-banner.show{max-height:60px;opacity:1;padding:10px 14px;}
+
+/* 2026-10-02新增：管理頁改用可收合區塊（details/summary），原本雲端設定／備份／
+   授權／系統設定／帳號／供應商／品項／單價紀錄全部攤平在同一條無限捲動的頁面裡，
+   重要但少用的設定（網址、備份還原、授權）跟每天都會用的（品項、帳號、供應商）
+   混在一起，捲動時容易捲過重要設定、也很難一眼找到要改的地方。拆成分區塊收合：
+   日常操作類別預設展開，風險較高、不常動的系統設定類別預設收合，降低手滑誤觸、
+   也讓畫面一眼看出「現在要找的東西在哪一類」。用原生details/summary，不需要
+   額外寫開合邏輯，手機上原生支援良好。 */
+.admin-group{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;
+  overflow:hidden;background:var(--card);}
+.admin-group summary{list-style:none;cursor:pointer;padding:16px;font-size:17px;font-weight:700;
+  color:var(--charcoal);display:flex;align-items:center;justify-content:space-between;
+  background:var(--gray-bg);}
+.admin-group summary::-webkit-details-marker{display:none;}
+.admin-group summary .grp-cnt{font-size:13px;font-weight:500;color:var(--gray);margin-left:8px;}
+.admin-group summary .grp-chev{transition:transform .2s;color:var(--gray);font-size:14px;}
+.admin-group[open] summary .grp-chev{transform:rotate(90deg);}
+.admin-group summary .grp-icon{margin-right:6px;}
+.admin-group .admin-group-body{padding:14px;}
+.admin-group.risk summary{background:#FBEFDC;}
+.admin-group.risk summary .grp-label{color:var(--brand-dark);}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@700;900&display=swap&text=%E7%87%92%E9%85%92%E7%83%A4%E7%83%A4%E8%B1%AC%E5%8F%AB%E8%B2%A8%E7%B3%BB%E7%B5%B1%E9%81%B8%E6%93%87%E4%BE%9B%E6%87%89%E5%95%86%E6%94%B6%E8%B2%A8%E5%B0%8D%E5%B8%B3%E5%BA%AB%E5%AD%98%E7%9B%A4%E9%BB%9E%E7%AE%A1%E7%90%86%E7%A2%BA%E8%AA%8D%E7%B5%90%E5%B8%B3%E5%93%81%E9%A0%85%E6%B8%85%E5%96%AE%E8%BF%91%E6%9C%9F%E5%B7%B2%E5%AE%8C%E6%88%90%E9%80%99%E7%AD%86%E8%A8%82%E5%96%AE%E5%AF%A6%E6%94%B6%E7%B8%BD%E9%A1%8D%E7%B6%A6%E7%9B%9B%E8%99%9F%E8%8F%9C%E5%95%86%E5%9C%8B%E8%B1%90%E5%95%86%E8%A1%8C%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%E5%AF%B6%E5%BC%B7%E9%9F%93%E6%BF%9F%E5%90%8D%E5%91%B3%E5%93%81%E6%9C%89%E9%99%90%E5%85%AC%E5%8F%B8%E9%A3%9F%E6%9D%90%E4%BD%A9%E6%A3%AE%E8%82%89%E8%88%96%E6%BA%90%E9%AE%AE%E8%BE%B2%E6%A5%AD%E5%B0%9A%E8%AA%A0%E5%9C%8B%E9%9A%9B">
+<style id="skin-v2-rounded">
+/* ===== 2026-10-28 外觀升級 v2「圓潤質感版」（Barbara 指定：膠囊按鈕、大圓角、浮起陰影；按鈕位置與流程不變）：膠囊按鈕、大圓角、浮起陰影；按鈕位置與流程不變 ===== */
+:root{--ink:#231B17;--paper:#F5EEE4;--card:#FFFCF8;--tile:#F8F2EA;--line:#E9DFD2;
+ --brand:#C0391F;--brand-dark:#93260F;--gold:#C9A35C;--gold-soft:#F5EAD4;
+ --charcoal:#1D1614;--gray:#6E6159;--ok:#2F6B3E;
+ --lift:0 1px 2px rgba(40,25,18,.05),0 8px 20px -6px rgba(40,25,18,.14);
+ --lift-lg:0 2px 4px rgba(40,25,18,.06),0 16px 32px -10px rgba(40,25,18,.22);
+ --ember-glow:0 10px 22px -8px rgba(192,57,31,.6),inset 0 1px 0 rgba(255,255,255,.22);
+ --serif:"Noto Serif TC","Noto Serif CJK TC","Songti TC",serif;}
+::selection{background:#F3D2C4;color:var(--ink);}
+html,body{caret-color:var(--brand);}
+body{background:var(--paper);background-image:none;padding-bottom:120px;}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
+input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;border-color:var(--brand)!important;}
+/* 頂部：深炭、下緣圓角 */
+.topbar{background:linear-gradient(180deg,#261C19,#17100E);border-radius:0 0 26px 26px;padding:16px 18px 18px;box-shadow:0 10px 24px -12px rgba(0,0,0,.45);}
+.topbar h1{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.06em;color:#FBF3E8;}
+.topbar .sub{color:var(--gold);font-size:13px;letter-spacing:.3em;font-weight:700;}
+#loggedInLabel{color:#E9DFD3!important;}
+#loggedInBar button{background:rgba(255,255,255,.08)!important;border:1px solid rgba(201,163,92,.55)!important;color:#EBD9B4!important;border-radius:999px!important;padding:8px 16px!important;}
+.sync-line{font-size:12px;margin:14px 0 6px;}
+.page-title{font-family:var(--serif);font-weight:900;font-size:26px;letter-spacing:.04em;color:var(--ink);margin:6px 2px 16px;}
+.page-title .cnt{font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;font-size:13px;font-weight:600;color:var(--gray);background:var(--gold-soft);padding:3px 10px;border-radius:999px;letter-spacing:0;}
+/* 新增供應商：膠囊輸入＋膠囊按鈕 */
+.add-supplier-top{border:none;background:var(--card);border-radius:999px;padding:6px;box-shadow:var(--lift);margin-bottom:18px;}
+.add-supplier-top input{border:none!important;background:transparent;border-radius:999px;padding:12px 14px;}
+.add-supplier-top button{border-radius:999px;padding:12px 22px;background:var(--brand);box-shadow:var(--ember-glow);}
+/* 供應商卡片：大圓角、無邊框、浮起；左圓形字標、右圓形箭頭鈕 */
+.supplier-card{border:none;border-radius:24px;background:var(--card);box-shadow:var(--lift);padding:12px 12px 12px 12px;margin-bottom:12px;}
+.supplier-card:active{transform:scale(.98);box-shadow:var(--lift-lg);}
+.supplier-card .name{font-size:17px;font-weight:700;min-width:0;overflow-wrap:anywhere;line-height:1.35;}
+.supplier-card > .left:first-child{flex:1;min-width:0;flex-wrap:wrap;row-gap:4px;}
+.supplier-card > .left:first-child .sup-mono{margin-right:2px;}
+.supplier-card > .left:last-child{flex-shrink:0;margin-left:8px;}
+.supplier-card .star,.supplier-card .badge-in{white-space:nowrap;}
+.back-btn,.quick-reorder-btn{border-radius:999px!important;border:none!important;box-shadow:var(--lift);}
+.back-btn{background:var(--card)!important;}
+.quick-reorder-btn{background:linear-gradient(145deg,#D9B56E,#A7813C)!important;color:#2A1D0E!important;}
+.sticky-tools{background:var(--paper)!important;}
+.sync-line{min-height:30px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;}
+.update-pill{display:none;margin-left:6px;border:none;border-radius:999px;background:var(--charcoal);color:#F1D59A;font-size:13px;font-weight:700;padding:5px 12px;box-shadow:0 4px 10px -3px rgba(0,0,0,.35);}
+.update-pill.show{display:inline-flex;align-items:center;gap:4px;}
+.sup-mono{width:44px;height:44px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+ font-family:var(--serif);font-weight:900;font-size:19px;color:#FBF3E8;background:linear-gradient(145deg,#3A2B25,#1D1614);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 4px 10px -3px rgba(0,0,0,.35);}
+.supplier-card:nth-child(3n+2) .sup-mono{background:linear-gradient(145deg,#D2492C,#93260F);}
+.supplier-card:nth-child(3n) .sup-mono{background:linear-gradient(145deg,#D9B56E,#A7813C);color:#2A1D0E;}
+.supplier-card .star{background:var(--gold-soft);color:#7A5A22;border-radius:999px;font-size:12px;padding:4px 10px;}
+.supplier-card .badge-in{border-radius:999px;box-shadow:0 4px 10px -3px rgba(192,57,31,.5);}
+.supplier-card .chev{color:transparent;width:38px;height:38px;border-radius:50%;display:inline-block;background:var(--charcoal) no-repeat center/18px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h13M13 6l6 6-6 6'/%3E%3C/svg%3E");box-shadow:0 6px 12px -4px rgba(0,0,0,.35);}
+/* 品項清單：圓角卡片＋「－ 數量 ＋」 */
+.item-row{border:none;border-radius:22px;background:var(--card);box-shadow:var(--lift);padding:14px 14px 14px 16px;}
+.item-row.checked{background:#FFF6F2;box-shadow:0 0 0 2px rgba(192,57,31,.35),var(--lift);}
+.item-price-row input{border-radius:999px!important;border:1px solid var(--line)!important;background:var(--tile);}
+.qty-stepper{display:inline-flex;align-items:center;gap:4px;background:var(--tile);border-radius:999px;padding:4px;box-shadow:inset 0 1px 2px rgba(40,25,18,.08);}
+.qty-stepper button{width:36px;height:36px;border-radius:50%;border:none;font-size:22px;line-height:1;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
+.qty-stepper .st-minus{background:#fff;color:var(--ink);box-shadow:0 2px 6px -2px rgba(40,25,18,.3);}
+.qty-stepper .st-plus{background:var(--brand);color:#fff;box-shadow:var(--ember-glow);}
+.qty-stepper .qty-input{width:52px!important;height:36px!important;border:none!important;background:transparent!important;font-size:18px;font-weight:800;}
+/* 收貨：大圓角卡片、品項小磚、膠囊輸入、深色總額塊 */
+.card,.order-card,.supplier-block,.stock-row{border:none;border-radius:24px;background:var(--card);box-shadow:var(--lift);}
+#receiveList .card{padding:18px 16px;}
+#receiveList .card > div:first-child{font-family:var(--serif);font-weight:900;font-size:22px;letter-spacing:.04em;margin-bottom:6px!important;}
+.recv-item{background:var(--tile);border:none!important;border-radius:18px;padding:12px 12px 10px!important;margin-bottom:10px;}
+.recv-item > span:first-child{font-weight:700;color:var(--ink);}
+.recv-item input{border:none!important;background:#fff;border-radius:999px!important;height:42px;font-size:17px!important;font-weight:700;box-shadow:inset 0 1px 2px rgba(40,25,18,.1),0 1px 0 rgba(255,255,255,.8);}
+#receiveList .card > div[style*="border-top:2px"]{background:linear-gradient(145deg,#2A201C,#17100E);color:#FBF3E8;border:none!important;border-radius:20px;padding:16px 18px!important;margin-top:14px!important;box-shadow:var(--lift-lg);}
+#receiveList .card > div[style*="border-top:2px"] span:last-child{color:#E8C886;font-size:20px;}
+.all-ok-btn{border-radius:999px;background:var(--gold-soft);color:#5C4418;border:none;padding:15px;box-shadow:inset 0 0 0 1px rgba(201,163,92,.55);}
+.confirm-recv-btn,.confirm-btn{border-radius:999px;background:var(--brand);box-shadow:var(--ember-glow);padding:17px;letter-spacing:.06em;}
+.icon-btn{border-radius:999px!important;border:none!important;background:var(--card)!important;box-shadow:var(--lift);}
+.status-pill{border-radius:999px;}
+.status-sent{background:var(--gold-soft);color:#7A5A22;}
+.recv-tap{display:inline-block;float:right;background:var(--charcoal);color:#fff;border-radius:999px;padding:8px 16px;font-size:14px;}
+/* 結帳列：懸浮深炭膠囊 */
+.checkout-bar{left:12px;right:12px;bottom:96px;border-radius:24px;background:linear-gradient(145deg,#2A201C,#17100E);box-shadow:var(--lift-lg);border:none;}
+.checkout-bar button{border-radius:999px;background:var(--brand);box-shadow:var(--ember-glow);}
+/* 底部分頁：懸浮圓角條，選到的分頁有圓形底 */
+.tabbar{left:12px;right:12px;bottom:12px;border-radius:28px;background:#17100E;border:none;box-shadow:0 14px 30px -10px rgba(0,0,0,.55);padding:6px 4px;}
+.tabbar .tab{color:#A3958B;font-size:14px;font-weight:600;padding:6px 0;gap:3px;}
+.tabbar .tab .ic{font-size:0;width:44px;height:30px;border-radius:999px;background:currentColor;-webkit-mask:no-repeat center/24px;mask:no-repeat center/24px;}
+.tabbar .tab.on{color:#F1D59A;}
+.tabbar .tab.on .ic{background:#F1D59A;}
+.tabbar .tab.on{background:radial-gradient(closest-side,rgba(241,213,154,.14),transparent);}
+.tabbar .tab[data-tab="order"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4' width='14' height='17' rx='3'/%3E%3Cpath d='M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='4' width='14' height='17' rx='3'/%3E%3Cpath d='M9 4V3h6v1M8.5 10h7M8.5 14h7M8.5 18h4'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="receive"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16z'/%3E%3Cpath d='M3.5 8 12 12.5 20.5 8M12 12.5v8'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8 12 3.5 20.5 8v8L12 20.5 3.5 16z'/%3E%3Cpath d='M3.5 8 12 12.5 20.5 8M12 12.5v8'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="stock"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 20V11M12 20V5M17 20v-6'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h16M7 20V11M12 20V5M17 20v-6'/%3E%3C/svg%3E");}
+.tabbar .tab[data-tab="admin"] .ic{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7'/%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3Cpath d='M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7'/%3E%3C/svg%3E");}
+.toast{background:#1D1614;border-radius:999px;}
+.mini-field input{border-radius:999px!important;border:1px solid var(--line)!important;background:var(--tile)!important;padding:11px 14px!important;}
+.order-card{padding:16px!important;}
+.sync-success-banner{background:#1F3A27;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1 id="shopNameDisplay" style="white-space:nowrap;">🔥 燒酒烤烤豬</h1>
+    <div class="sub"><span id="appSubDisplay">叫貨系統</span> <span class="readonly-badge">唯讀模式</span></div>
+  </div>
+  <div class="role-pick" id="loggedInBar">
+    <span id="loggedInLabel" style="color:#fff;font-size:13px;line-height:1.3;max-width:150px;"></span>
+    <button onclick="doLogout()" style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);
+      border-radius:8px;padding:8px 12px;font-size:14px;white-space:nowrap;flex-shrink:0;">登出</button>
+  </div>
+</div>
+
+<div class="pending-sync-banner" id="pendingSyncBanner">
+  <span id="pendingSyncText">⚠️ 有資料尚未確認送達雲端，請勿關閉App，正在自動重試…</span>
+  <button id="pendingSyncBtn" onclick="pendingBannerAction_()">立即重試</button>
+</div>
+<div class="sync-success-banner" id="syncSuccessBanner"></div>
+<div class="sync-line" id="syncLine"><span class="sync-dot" id="syncDot"></span><span id="syncText">資料已同步（本機儲存）</span><span id="tokenFixLink" class="token-fix-link" style="display:none;" onclick="openTokenModalByUser_()">輸入代碼</span><span id="verText" style="margin-left:8px;font-size:10px;color:var(--gray);opacity:.8;"></span><button type="button" class="update-pill" id="updatePill" onclick="applyUpdate_()">↻ 有新版本，點這裡更新</button></div>
+
+<!-- ============ 登入畫面 ============ -->
+<div class="modal-mask show" id="loginGate" style="align-items:center;z-index:300;">
+  <div class="modal-sheet" style="border-radius:20px;max-width:340px;">
+    <h3 style="text-align:center;">🔥 燒酒烤烤豬叫貨系統</h3>
+    <div id="loginLoadingHint" style="text-align:center;color:var(--gray);font-size:13px;margin-bottom:10px;">資料載入中，請稍候…</div>
+    <div class="field-row"><label>帳號</label><input type="text" id="loginAccount" placeholder="請輸入帳號" inputmode="text" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="field-row"><label>密碼</label><input type="password" id="loginPassword" placeholder="請輸入密碼" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div id="loginError" style="color:var(--warn);font-size:13px;text-align:center;margin-bottom:8px;display:none;">帳號或密碼錯誤</div>
+    <button class="confirm-btn" onclick="doLogin()">登入</button>
+  </div>
+</div>
+
+
+<!-- ============ 頁面1：下單－選供應商 ============ -->
+<section class="page active" id="page-order">
+  <div class="page-title">選擇供應商 <span class="cnt" id="supplierCount"></span></div>
+  <div class="add-supplier-top" id="addSupplierRow">
+    <input type="text" id="newSupplierName" placeholder="＋ 新廠商？在這裡輸入名稱直接新增" onkeydown="if(event.key==='Enter')addSupplier()">
+    <button onclick="addSupplier()">新增</button>
+  </div>
+  <div id="supplierList"></div>
+</section>
+
+<!-- ============ 頁面2：品項清單（單一供應商） ============ -->
+<section class="page" id="page-items">
+  <div class="sticky-tools">
+    <button class="back-btn" onclick="goPage('page-order')">‹ 返回供應商</button>
+    <button class="quick-reorder-btn" onclick="quickReorder()">✨快速再訂（複製上次）</button>
+  </div>
+  <div class="sticky-tools" style="top:118px;">
+    <button class="back-btn" id="viewToggleBtn" onclick="toggleItemView()" style="flex:1;">🔲 切換成方格檢視</button>
+  </div>
+  <div class="page-title" id="itemsSupplierTitle"></div>
+  <div id="itemList"></div>
+  <div class="add-supplier-row" id="addItemRow">
+    <input type="text" id="newItemName" placeholder="新增品項名稱…">
+    <input type="text" id="newItemPrice" placeholder="單價" style="max-width:70px;">
+    <button class="icon-btn" onclick="addItem()">＋新增</button>
+  </div>
+</section>
+
+<!-- ============ 頁面3：結帳 ============ -->
+<section class="page" id="page-checkout">
+  <div class="page-title">確認結帳</div>
+  <div id="checkoutBody"></div>
+  <div class="field-row">
+    <label>交貨日期</label>
+    <input type="date" id="deliveryDate">
+  </div>
+  <div class="field-row">
+    <label>備註（選填）</label>
+    <input type="text" id="orderNote" placeholder="例如：明天中午前到貨">
+  </div>
+  <div class="grand-total">總計 NTD <span id="grandTotal">0</span></div>
+  <button class="confirm-btn" id="checkoutConfirmBtn" onclick="confirmCheckout()">確認送出並產生LINE清單</button>
+  <div id="checkoutSubmitting" style="display:none;text-align:center;padding:14px;color:#8a7a5c;font-size:14px;">⏳ 送出中，確認雲端收到後才會顯示完成，請稍候…</div>
+  <button id="checkoutRetryBtn" class="confirm-btn" style="display:none;background:#c0392b;" onclick="retryCheckoutPush()">⚠️ 雲端尚未確認收到，點此重新送出</button>
+</section>
+
+<!-- ============ 頁面4：收貨對帳 ============ -->
+<section class="page" id="page-receive">
+  <div class="page-title">收貨對帳 <span class="cnt">例外提示制：沒差異不用動</span></div>
+  <button class="icon-btn" style="width:100%;margin-bottom:12px;" onclick="openMonthlyView()">📅 查看整月叫貨明細</button>
+  <div id="receiveList"></div>
+</section>
+
+<!-- ============ 頁面4b：整月叫貨明細 ============ -->
+<section class="page" id="page-monthly">
+  <div class="sticky-tools">
+    <button class="back-btn" onclick="switchTab('receive')">‹ 返回收貨對帳</button>
+  </div>
+  <div class="page-title">整月叫貨明細</div>
+  <div class="field-row">
+    <label>選擇月份</label>
+    <input type="month" id="monthlyPicker" onchange="renderMonthlyView()">
+  </div>
+  <div class="stock-filter">
+    <button id="monthlyModeItem" class="on" onclick="setMonthlyMode('item')">逐筆列表</button>
+    <button id="monthlyModeSum" onclick="setMonthlyMode('sum')">彙總報表</button>
+  </div>
+  <div id="monthlyBody"></div>
+</section>
+
+<!-- ============ 頁面5：庫存盤點 ============ -->
+<section class="page" id="page-stock">
+  <div class="page-title">庫存盤點 <span class="cnt">改完自動儲存，不用另外按存檔</span></div>
+  <div class="stock-month-row"><label for="stockMonth">盤點月份</label><input type="month" id="stockMonth" onchange="setStockMonth_(this.value)"></div>
+  <div id="stockSummary"></div>
+  <div class="stock-filter" id="stockFilter"></div>
+  <div id="stockList"></div>
+</section>
+
+<!-- ============ 頁面6：供應商管理／紀錄 ============ -->
+<section class="page" id="page-admin">
+
+  <!-- 2026-10-02重整：原本8個區塊攤平成一條無限捲動的頁面，現在分成3個可收合
+       群組——「系統設定與安全」風險較高、不常動，預設收合；「人員與供應商」「商品
+       管理」是日常操作，預設展開。所有原本的id／render函式完全沒有變動，只是外面
+       多包一層details，不影響任何現有邏輯。 -->
+  <details class="admin-group risk" id="adminGroupSystem">
+    <summary><span><span class="grp-icon">⚙️</span><span class="grp-label">系統設定與安全</span><span class="grp-cnt">雲端網址・備份還原・授權・外觀，僅維護專員</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">雲端同步設定 <span class="cnt">僅維護專員可設定</span></div>
+      <div class="card" id="cloudSyncCard"></div>
+
+      <div class="page-title">資料備份／還原 <span class="cnt">僅維護專員可操作</span></div>
+      <div class="card" id="backupCard"></div>
+
+      <div class="page-title">系統授權管理</div>
+      <div class="card" id="licensePanel"></div>
+
+      <div class="page-title">系統設定 <span class="cnt">僅最高權限可修改</span></div>
+      <div class="card" id="settingsCard">
+        <div class="field-row">
+          <label>店名（顯示在頂部標題）</label>
+          <input type="text" id="settingShopName" placeholder="例如：燒酒烤烤豬">
+        </div>
+        <div class="field-row">
+          <label>副標題</label>
+          <input type="text" id="settingAppSub" placeholder="例如：叫貨系統">
+        </div>
+        <div class="field-row">
+          <label>分頁圖示（Icon／Logo，方便開多個分頁時辨識）</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="faviconPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
+            <input type="file" id="faviconUpload" accept="image/*" onchange="onFaviconUpload(event)">
+          </div>
+        </div>
+        <div class="field-row" id="bgPatternRow">
+          <label>整體背景圖案 <span style="color:var(--brand);font-weight:700;">（僅「維護專員」可設定）</span></label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="bgPreview" src="" alt="" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--line);display:none;object-fit:cover;">
+            <input type="file" id="bgUpload" accept="image/*" onchange="onBgUpload(event)">
+            <button class="icon-btn" onclick="resetBg()" type="button">還原預設</button>
+          </div>
+        </div>
+        <button class="icon-btn" style="width:100%;" onclick="saveSettings()">儲存設定</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="admin-group" id="adminGroupPeople" open>
+    <summary><span><span class="grp-icon">👥</span><span class="grp-label">人員與供應商</span><span class="grp-cnt">帳號、供應商清單</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">帳號管理 <span class="cnt">僅維護專員可操作</span></div>
+      <div class="card" id="accountManageList"></div>
+      <div class="card" id="accountAddForm" style="display:none;">
+        <div class="field-row"><label>帳號</label><input type="text" id="newAccAccount" placeholder="例如：manager01" autocapitalize="off" autocorrect="off" spellcheck="false"></div>
+        <div class="field-row"><label>密碼（建議4-6位數字）</label><input type="text" id="newAccPassword" placeholder="例如：1234"></div>
+        <div class="field-row"><label>姓名</label><input type="text" id="newAccName" placeholder="例如：陳店長"></div>
+        <div class="field-row"><label>角色</label>
+          <select id="newAccRole"></select>
+        </div>
+        <button class="icon-btn" style="width:100%;" onclick="addAccount()">＋新增帳號</button>
+      </div>
+
+      <div class="page-title" style="margin-top:18px;">供應商管理</div>
+      <div class="card" id="importCard" style="display:none;">
+        <div style="font-size:13px;margin-bottom:8px;">客戶提供的完整供應商名單（23家、249項品項）已內建在系統裡，按下方按鈕一次匯入。已存在的供應商/品項不會重複新增，可以放心多按幾次。</div>
+        <button class="icon-btn" style="width:100%;" onclick="importFullSupplierList()">📥 一鍵匯入完整供應商名單</button>
+      </div>
+      <div class="card" id="adminSupplierList"></div>
+    </div>
+  </details>
+
+  <details class="admin-group" id="adminGroupItems" open>
+    <summary><span><span class="grp-icon">📦</span><span class="grp-label">商品管理</span><span class="grp-cnt">品項、單價異動紀錄</span></span><span class="grp-chev">›</span></summary>
+    <div class="admin-group-body">
+      <div class="page-title">品項管理 <span class="cnt">可新增、修改單位、排序、刪除</span></div>
+      <div class="card">
+        <div class="field-row" style="margin-bottom:0;">
+          <label>選擇供應商</label>
+          <select id="itemManageSupplierSelect" onchange="renderItemManage()"></select>
+        </div>
+      </div>
+      <div class="add-supplier-row" id="itemManageAddRow">
+        <input type="text" id="itemManageNewName" placeholder="新增品項名稱…">
+        <input type="text" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
+        <button class="icon-btn" onclick="addItemFromManage()">＋新增</button>
+      </div>
+      <div id="itemManageList"></div>
+
+      <div class="page-title" style="margin-top:18px;">單價異動紀錄</div>
+      <div class="card" id="priceLog"></div>
+    </div>
+  </details>
+</section>
+
+<div class="checkout-bar" id="checkoutBar">
+  <div>
+    <div class="info" id="checkoutInfoLine">已選 0 家供應商</div>
+    <div class="total">NTD <span id="cartTotal">0</span></div>
+  </div>
+  <button onclick="goPage('page-checkout');resetCheckoutPicks_();renderCheckout();">前往結帳</button>
+</div>
+
+<!-- LINE分享彈窗 -->
+<div class="modal-mask" id="shareModal">
+  <div class="modal-sheet">
+    <h3 id="shareTitle">訂單已建立</h3>
+    <div id="sharePreviewList"></div>
+    <button class="close-modal" onclick="closeShareModal()">完成，關閉視窗</button>
+  </div>
+</div>
+
+<div class="pending-share-bar" id="pendingShareBar"><span id="pendingShareText">有單已送達，叫貨清單還沒傳給廠商</span>
+  <button onclick="openPendingShare_()">開啟清單</button></div>
+<div class="modal-mask" id="priceGuardModal">
+  <div class="modal-sheet">
+    <h3>⚠️ 以下品項價格變動較大，請確認</h3>
+    <div style="font-size:13px;color:var(--gray);margin-bottom:8px;">確認後，下次下單會自動帶入新單價</div>
+    <div id="priceGuardList"></div>
+    <div class="price-guard-btns">
+      <button class="pg-update" onclick="resolvePriceGuard_('update')">確認，更新單價</button>
+      <button onclick="resolvePriceGuard_('keep')">這次照實收入帳，不改單價</button>
+      <button onclick="resolvePriceGuard_('back')">回去修改</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<nav class="tabbar">
+  <button class="tab on" data-tab="order" onclick="switchTab('order')"><span class="ic">📋</span>下單</button>
+  <button class="tab" data-tab="receive" onclick="switchTab('receive')"><span class="ic">📦</span>收貨</button>
+  <button class="tab" data-tab="stock" onclick="switchTab('stock')"><span class="ic">📊</span>盤點</button>
+  <button class="tab" data-tab="admin" onclick="switchTab('admin')"><span class="ic">⚙️</span>管理</button>
+</nav>
+
+<script>
+/* =========================================================
+   烤烤豬叫貨系統 － Phase 1 前端原型
+   資料層：localStorage（真實部署後可換成後端API，介面呼叫不用大改）
+   ========================================================= */
+
+const FULL_SUPPLIER_IMPORT = [
+  { name:'韓濟名味品有限公司-酒水', items:[
+    {name:'真露-青葡萄燒酒360ML', unit:'20瓶/箱', price:1980},
+    {name:'優格風味燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2080},
+    {name:'水蜜桃燒酒〔初飲初樂〕360ML', unit:'20瓶/箱', price:2050},
+    {name:'初飲初樂-蘋果', unit:'20瓶/箱', price:2000},
+    {name:'海太水梨汁238ML', unit:'72瓶/箱', price:1560},
+    {name:'海太葡萄汁238ML', unit:'72瓶/箱', price:1500},
+    {name:'CASS啤酒640ML', unit:'12瓶/箱', price:715},
+    {name:'JINRO真露復古風燒酒360ML', unit:'20瓶/箱', price:1900},
+    {name:'清露-蜂蜜梅子燒酒360ML', unit:'20瓶/箱', price:1700},
+    {name:'清露-蜂蜜芭樂燒酒360ML', unit:'20瓶/箱', price:1700},
+    {name:'韓國TERRA啤酒500ML', unit:'12瓶/箱', price:780},
+    {name:'SAERO初飲初樂新燒酒(九尾狐)', unit:'20瓶/箱', price:1610},
+    {name:'初飲初樂-荔枝燒酒360ML', unit:'20瓶/箱', price:2050},
+    {name:'清露-蜂蜜蘋果燒酒360ML', unit:'20瓶/箱', price:1700},
+  ]},
+  { name:'韓濟名味品有限公司-食材', items:[
+    {name:'芸豆罐頭', unit:'420g/罐', price:50},
+    {name:'湯醬油', unit:'1.7L/瓶', price:180},
+    {name:'韓國蘋果醋', unit:'1.8L/瓶', price:150},
+    {name:'歡滿醋', unit:'1.8L/瓶', price:161},
+    {name:'玉米麥芽糖', unit:'2.45k/瓶', price:160},
+    {name:'大州香油', unit:'1.8L/罐', price:620},
+    {name:'黃豆醬(味噌)', unit:'14kg/桶', price:1038},
+    {name:'蔬菜 調味醬(沾醬)', unit:'14kg/桶', price:968},
+    {name:'大象清境園(順昌)辣椒醬', unit:'桶', price:888},
+    {name:'梅子濃縮液', unit:'1050ml/罐', price:316},
+    {name:'韓式辣椒粉(細)', unit:'3kg/包', price:798},
+    {name:'頂極真味牛肉調味粉', unit:'1kg/包', price:220},
+    {name:'綜合海鮮調味粉', unit:'1kg/包', price:258},
+    {name:'不倒翁-乾麵', unit:'110g*5入/袋', price:440},
+    {name:'韓式胡椒粉', unit:'200g/包', price:132},
+    {name:'泡菜', unit:'10kg/箱', price:1050},
+    {name:'頂級韓國生蝦醬', unit:'1Kg/罐', price:339},
+    {name:'年糕條', unit:'1.8kg/包', price:189},
+    {name:'釜山甜不辣(魚板)', unit:'1kg/包', price:150},
+    {name:'頂極海苔絲', unit:'1kg/包', price:700},
+    {name:'LOTTE韓式火腿', unit:'340g/盒', price:85},
+    {name:'蜂蜜柚子茶', unit:'1瓶', price:302},
+    {name:'辛辣粉', unit:'罐', price:230},
+    {name:'3號陶鍋', unit:'一箱20個', price:2980},
+    {name:'黑麵醬', unit:'罐', price:320},
+    {name:'七甲拌涼麵', unit:'包', price:155},
+    {name:'清正魚露', unit:'1kg/瓶', price:150},
+    {name:'蘋果醬', unit:'950克罐', price:237},
+    {name:'石鍋拌飯(16cm)', unit:'個', price:510},
+    {name:'石鍋拌飯15公分', unit:'個', price:484},
+    {name:'辣牛肉（校洞）500克）', unit:'包', price:92.34},
+    {name:'芝心年糕條', unit:'包', price:190},
+    {name:'韓式專業豆腐條', unit:'包', price:25},
+    {name:'山菜（蕨菜干）', unit:'片', price:160},
+    {name:'蔘雞湯', unit:'包', price:190},
+    {name:'清淨園煎餅粉', unit:'1kg/12包/箱', price:75},
+    {name:'寬冬粉', unit:'公斤', price:126},
+  ]},
+  { name:'盛豐行', items:[
+    {name:'金牌啤酒', unit:'12瓶/箱', price:584},
+    {name:'18生', unit:'20瓶/箱', price:1340},
+    {name:'可樂-330ml', unit:'24瓶/箱', price:340},
+    {name:'雪碧-330ml', unit:'24瓶/箱', price:340},
+  ]},
+  { name:'寶強', items:[
+    {name:'白色毛巾抹布(長)', unit:'包', price:300},
+    {name:'黃色海綿菜瓜布', unit:'包', price:40},
+    {name:'B700 淺盒/蓋', unit:'組', price:250},
+    {name:'大捲廁所衛生紙', unit:'箱', price:500},
+    {name:'沙拉脫', unit:'罐', price:60},
+    {name:'漂白水', unit:'罐', price:65},
+    {name:'超力除油靈', unit:'箱', price:1200},
+    {name:'瓦斯罐', unit:'組', price:120},
+    {name:'保鮮膜(200尺)', unit:'條', price:70},
+    {name:'4兩內袋', unit:'包', price:35},
+    {name:'半斤內袋', unit:'包', price:35},
+    {name:'1斤內袋', unit:'包', price:35},
+    {name:'3斤內袋', unit:'包', price:35},
+    {name:'5斤內袋', unit:'包', price:35},
+    {name:'10斤內袋', unit:'包', price:35},
+    {name:'260湯碗', unit:'條', price:55},
+    {name:'260湯碗+蓋', unit:'組', price:80},
+    {name:'RBC03B黑色扣盒', unit:'箱', price:2550},
+    {name:'RBC03B扣盒中層', unit:'箱', price:1200},
+    {name:'1.5盎司醬料杯', unit:'組', price:110},
+    {name:'2盎司醬料杯(高)', unit:'組', price:100},
+    {name:'阿湯哥湯匙', unit:'包', price:40},
+    {name:'套筷', unit:'包', price:50},
+    {name:'擦手紙', unit:'箱', price:500},
+    {name:'濕紙巾(扁長)', unit:'箱', price:550},
+    {name:'9*9百盒餐巾紙', unit:'箱', price:430},
+    {name:'龍頭牌1斤背心袋(全白)', unit:'包', price:30},
+    {name:'龍頭牌5斤背心袋(全白)', unit:'包', price:30},
+    {name:'M-8-2牛皮紙袋', unit:'50入/捆', price:300},
+    {name:'黑色焦炭菜瓜布', unit:'包', price:100},
+    {name:'男用洗碗手套(素色8號半)', unit:'雙', price:50},
+    {name:'女用洗碗手套(雙色7號半)', unit:'雙', price:35},
+    {name:'紅垃圾袋(小)', unit:'捲', price:80},
+    {name:'灰垃圾袋(大)', unit:'袋', price:1375},
+    {name:'鋁箔紙', unit:'條', price:110},
+    {name:'手扒雞手套', unit:'盒', price:30},
+    {name:'塑膠牙籤單包裝', unit:'盒', price:200},
+    {name:'45*500大保鮮膜', unit:'捲', price:700},
+    {name:'紙試飲杯', unit:'條', price:15},
+    {name:'內場乳膠手套(L)', unit:'盒', price:300},
+    {name:'520紙碗/蓋', unit:'組', price:105},
+  ]},
+  { name:'巨無霸冰品', items:[
+    {name:'香草牛奶粉', unit:'20包/箱', price:4000},
+  ]},
+  { name:'綦盛號菜商', items:[
+    {name:'粉蔥', unit:'斤', price:105},
+    {name:'黃豆芽', unit:'斤', price:17},
+    {name:'冷凍毛豆', unit:'包', price:95},
+    {name:'糯米椒', unit:'斤', price:105},
+    {name:'無籽綠檸檬', unit:'斤', price:48},
+    {name:'紫洋蔥', unit:'斤', price:55},
+    {name:'紫高麗菜 (生菜沙拉)', unit:'斤', price:45},
+    {name:'西生菜 (生菜沙拉)', unit:'斤', price:92},
+    {name:'蘿蔓生菜 (生菜沙拉)', unit:'斤', price:125},
+    {name:'雞胸骨', unit:'斤', price:12},
+    {name:'白蘿蔔', unit:'斤', price:25},
+    {name:'紅蘿蔔', unit:'斤', price:25},
+    {name:'紅辣椒', unit:'斤', price:110},
+    {name:'綠辣椒', unit:'斤', price:110},
+    {name:'小辣椒', unit:'斤', price:115},
+    {name:'大蒜仁', unit:'斤', price:95},
+    {name:'小蒜仁', unit:'斤', price:75},
+    {name:'蒜泥 (斤/包)', unit:'斤', price:72},
+    {name:'鮮蚵', unit:'斤', price:135},
+    {name:'特大蛤蜊', unit:'斤', price:140},
+    {name:'蜆仔', unit:'斤', price:95},
+    {name:'高山高麗菜 (炸醬麵)', unit:'斤', price:35},
+    {name:'進口洋芋 (炸醬麵)', unit:'斤', price:45},
+    {name:'山東白菜 (部隊鍋)', unit:'斤', price:35},
+    {name:'金針菇 (部隊鍋)', unit:'包', price:15},
+    {name:'薑泥（部隊醬）', unit:'斤', price:90},
+    {name:'中華豆腐', unit:'盒', price:17},
+    {name:'板豆腐', unit:'板', price:60},
+    {name:'油菜', unit:'斤', price:32},
+    {name:'綠豆芽', unit:'斤', price:12},
+    {name:'小黃瓜', unit:'斤', price:60},
+    {name:'中薑', unit:'斤', price:170},
+    {name:'拉麵(細)', unit:'斤', price:40},
+    {name:'進口水菜', unit:'斤', price:50},
+    {name:'小韭菜', unit:'斤', price:108},
+    {name:'進口洋蔥', unit:'斤', price:33},
+    {name:'紅薯(地瓜)', unit:'斤', price:33},
+    {name:'杏鮑菇', unit:'斤', price:87},
+    {name:'生香菇', unit:'斤', price:140},
+    {name:'特大生香菇', unit:'斤', price:155},
+    {name:'鳳梨', unit:'斤', price:50},
+    {name:'蘋果', unit:'斤', price:20},
+    {name:'水梨', unit:'斤', price:110},
+    {name:'特大洋菇(盒)', unit:'斤', price:240},
+    {name:'洋菇(盒)', unit:'盒', price:98},
+    {name:'巴西里', unit:'斤', price:95},
+    {name:'進口准山', unit:'斤', price:142},
+    {name:'帶皮玉米筍', unit:'斤', price:75},
+    {name:'綠節瓜', unit:'斤', price:72},
+    {name:'大陸妹A', unit:'斤', price:43},
+    {name:'鮮絞肉', unit:'斤', price:110},
+    {name:'豬板油', unit:'斤', price:58},
+    {name:'大里肌', unit:'斤', price:158},
+    {name:'肩甲排 (不砍)', unit:'斤', price:110},
+    {name:'去皮五花肉(切0.2cm)', unit:'斤', price:190},
+    {name:'帶皮五花肉(切0.4cm)', unit:'斤', price:190},
+    {name:'去皮台灣紅蔥頭', unit:'兩', price:90},
+    {name:'去皮五花肉', unit:'斤', price:180},
+    {name:'小腸', unit:'斤', price:65},
+    {name:'肝連', unit:'斤', price:150},
+    {name:'大腸頭', unit:'條', price:146},
+    {name:'大腸', unit:'斤', price:65},
+    {name:'檸檬原汁（柚子醬）', unit:'1罐', price:160},
+    {name:'櫻花蝦', unit:'斤', price:620},
+  ]},
+  { name:'佩森肉舖', items:[
+    {name:'純淨五花肉切2.5公分', unit:'公斤', price:483},
+    {name:'純淨豬梅花', unit:'公斤', price:387},
+  ]},
+  { name:'台益食品行', items:[
+    {name:'海帶芽半斤1包', unit:'斤', price:250},
+  ]},
+  { name:'品饌股份有限公司', items:[
+    {name:'T9帶骨清腿', unit:'公斤', price:185},
+    {name:'T9去骨腿肉(去環)', unit:'公斤', price:230},
+  ]},
+  { name:'國豐商行有限公司', items:[
+    {name:'精鹽(台鹽)', unit:'1Kg/包', price:17},
+    {name:'沙拉油(大成)', unit:'18L/桶', price:1010},
+    {name:'細砂糖', unit:'1.8kg/包', price:70},
+    {name:'太白粉', unit:'斤', price:60},
+    {name:'米酒', unit:'瓶', price:15},
+    {name:'金蘭(淡色)醬油', unit:'1.5L/桶', price:115},
+    {name:'柴魚精(烹大師)', unit:'1Kg/盒', price:290},
+    {name:'烏斯特辣醬油(進口)', unit:'295ml/罐', price:160},
+    {name:'是拉叉辣椒醬', unit:'680g/罐', price:80},
+    {name:'洋香菜葉(小磨坊)(包)', unit:'250g/包', price:355},
+    {name:'起司片(紅.安佳)', unit:'條', price:345},
+    {name:'白芝麻(熟)', unit:'斤', price:105},
+    {name:'鮮味炒手', unit:'罐', price:160},
+    {name:'日本味霖', unit:'1.8L/桶', price:155},
+    {name:'雞粉(康寶)2.2kg', unit:'包', price:460},
+    {name:'蛤精粉', unit:'盒', price:270},
+    {name:'番茄醬(可果美)', unit:'桶', price:190},
+    {name:'味精', unit:'包', price:85},
+    {name:'蜂蜜', unit:'3KG/桶', price:145},
+    {name:'黑胡椒粉(小磨坊)', unit:'包', price:315},
+    {name:'墨西哥青椒 切片', unit:'桶', price:260},
+    {name:'白胡椒粉(小磨坊)', unit:'盒', price:155},
+    {name:'開陽', unit:'包', price:300},
+    {name:'耐炸酥油(美食家)', unit:'桶', price:950},
+    {name:'芥末醬(大)', unit:'罐', price:305},
+    {name:'玉米粒', unit:'桶', price:24},
+    {name:'米酒頭0.6L/瓶', unit:'瓶', price:155},
+    {name:'李錦記熊貓蠔油', unit:'瓶', price:85},
+    {name:'二砂糖', unit:'公斤', price:35},
+    {name:'冰糖細', unit:'公斤', price:160},
+    {name:'紅棗', unit:'600克包', price:65},
+    {name:'枸紀', unit:'600克包', price:220},
+    {name:'糖粉', unit:'450G包', price:40},
+    {name:'老抽', unit:'罐', price:105},
+    {name:'金蘭醬油膏', unit:'罐', price:50},
+    {name:'洗衣粉10公斤袋', unit:'袋', price:280},
+    {name:'桂冠沙拉（冷藏）500克', unit:'包', price:85},
+    {name:'鮮奶油-麥斯馬汀', unit:'瓶', price:115},
+    {name:'佶子醬（玉英牌）550克瓶', unit:'瓶', price:210},
+    {name:'香蒜粒（玻璃瓶）小磨坊29克', unit:'罐', price:45},
+    {name:'低筋麵粉', unit:'斤', price:35},
+    {name:'十穀米（3公斤/包）', unit:'包', price:425},
+    {name:'黑胡椒圓粒松賀450克', unit:'包', price:230},
+    {name:'太白粉風車25公斤', unit:'袋', price:1480},
+  ]},
+  { name:'日本火腿', items:[
+    {name:'濃厚豚骨白湯HK-18(10包/1公斤)', unit:'箱', price:1995},
+  ]},
+  { name:'春發成實業有限公司', items:[
+    {name:'五花肉不帶皮', unit:'kg', price:520},
+    {name:'梅花肉', unit:'kg', price:615},
+    {name:'松阪肉', unit:'kg', price:1304},
+  ]},
+  { name:'源鮮農業', items:[
+    {name:'圓葉芝麻葉/300g', unit:'包', price:480},
+    {name:'義大利綠精靈/600g', unit:'包', price:270},
+    {name:'紅捲萵苣/600g', unit:'包', price:270},
+    {name:'紅酸模/100g', unit:'盒', price:160},
+  ]},
+  { name:'究好豬', items:[
+    {name:'五花肉3mm-切尾', unit:'Kg', price:330},
+    {name:'梅花肉', unit:'KG', price:300},
+    {name:'松阪豬', unit:'KG', price:600},
+  ]},
+  { name:'米屋智農股份有限公司', items:[
+    {name:'大橋CAS好米(台南11號)', unit:'3kg/包', price:165},
+  ]},
+  { name:'聖興軒食品有限公司', items:[
+    {name:'德式香腸人造衣', unit:'包', price:255},
+    {name:'特製培根(切)', unit:'KG', price:229},
+    {name:'寶宏雙色絲', unit:'包', price:240},
+  ]},
+  { name:'蛋商', items:[
+    {name:'雞蛋(20斤)', unit:'箱', price:980},
+  ]},
+  { name:'裕賀食品股份有限公司(牛肉商)', items:[
+    {name:'美國台塑牛小排', unit:'公斤', price:647.62},
+    {name:'美國特選肩小排', unit:'公斤', price:619.05},
+    {name:'美國帶油胸腹火鍋片', unit:'公斤', price:280.95},
+  ]},
+  { name:'陞輝食品(小農)', items:[
+    {name:'小農松坂肉', unit:'kg', price:605},
+    {name:'運費', unit:'次', price:289},
+  ]},
+  { name:'開店大師企業股份有限公司', items:[
+    {name:'酥脆卡脆粉-1(7.5Kg/包-4包/箱)', unit:'箱', price:2228.14},
+    {name:'外沾粉0303-3(15kg/包-2包/箱)', unit:'箱', price:2142.86},
+  ]},
+  { name:'高麗國泡菜', items:[
+    {name:'韓式泡菜(2700克)', unit:'包', price:370},
+  ]},
+  { name:'黑芝麻醬', items:[
+    {name:'黑芝麻醬(3公斤/6桶)', unit:'箱', price:4336.98},
+  ]},
+  { name:'高雄水產', items:[
+    {name:'單凍透抽21/25', unit:'kg', price:490},
+    {name:'運費', unit:'次', price:300},
+  ]},
+  { name:'尚誠國際有限公司', items:[
+    {name:'9分半蛤蠣', unit:'斤', price:125},
+    {name:'大蜆', unit:'斤', price:100},
+    {name:'盒卷(一排3-5隻/盒)', unit:'盒', price:125},
+    {name:'魷魚清肉(10公斤)', unit:'箱', price:245},
+    {name:'珍珠魚卵(500g/盒)', unit:'盒', price:180},
+    {name:'松葉蟹膏(300g/包)', unit:'包', price:550},
+    {name:'北海道日本干貝-4S(51-60顆/盒)', unit:'Kg', price:1620},
+    {name:'南美白蝦50/60', unit:'盒', price:190},
+    {name:'天使紅蝦', unit:'盒', price:420},
+    {name:'草蝦370g/8P', unit:'盒', price:205},
+    {name:'薄鹽鯖魚(4kg/21p/箱)', unit:'Kg', price:400},
+    {name:'透抽21/25-片涷', unit:'片', price:3882},
+  ]},
+];
+
+/* 金額一律四捨五入成整數：建立/編輯單價、驗收加總都套用這個 */
+function money(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n); }
+
+const DB_KEY = 'kklz_order_system_v1';
+const GAS_URL_KEY = 'kklz_gas_url';
+// 2026-10-01新增：記錄「本機還有異動尚未成功送到雲端」。存在localStorage而不是
+// 記憶體變數，是因為事故發生的那種情境（手機切到LINE分享訂單時分頁被系統中斷/
+// 整個重新整理）剛好會把記憶體變數清掉，但localStorage不會，才攔得住。
+const PENDING_SYNC_KEY = 'kklz_pending_sync_v1';
+// 2026-10-01全面體檢時新增：單純用「這次push成不成功」決定要不要清掉PENDING_SYNC_KEY
+// 不夠精準——如果push送出去之後、回應回來之前，又有別的異動發生（不管是不是同一筆），
+// 這次push的回應代表的只是「送出當下那個時間點的資料有沒有到」，不代表「現在最新的
+// 本機狀態都到齊了」。用一個單調遞增的版本號，push開始時記下目前版本，回應回來時
+// 只有「版本號完全沒變過」才代表這段期間沒有新異動插進來，才能真的清掉旗標。
+let localChangeVersion = 0;
+// 2026-10-02新增（Barbara要求修同步速度偏慢/偶爾失敗的問題）：記錄「上一次成功送到
+// 雲端、確認收到的時間點」，讓每次push不用再把整包db（全部供應商/品項/歷史訂單/
+// 單價紀錄/操作紀錄）都送一次，只送「這個時間點之後有異動過」的那一小部分。
+// 原理：後端mergeDb_()本來就是「送來的資料」跟「雲端現有資料」取聯集、用updatedAt
+// 比較新舊（見這支檔案最後mergeDb_的註解、以及後端程式碼同一套邏輯），根本不要求
+// 前端送「完整」的items/orders/suppliers/priceLog/actionLog——沒送到的那些，後端
+// 會直接沿用雲端現有版本，一樣在聯集裡，不會不見。刪除動作本來就是靠墓碑清單
+// （deletedItemIds等）判斷，跟陣列本身有沒有送齊完全無關，所以這個優化不影響刪除。
+// 只送「有變動的」，payload大小大致只跟「這次異動了多少筆」成正比，不再跟著歷史
+// 資料（訂單/操作紀錄越存越多）一起變大、變慢。
+// 安全性：預設值是EPOCH_ISO（最早的時間），代表「從來沒成功同步過」，第一次送出
+// 時效果等同以前的全量送出，之後每次成功送達才會把這個時間點往前推進，不會漏送。
+const LAST_SYNCED_AT_KEY = 'kklz_last_synced_at_v1';
+function getLastSyncedAt(){
+  try{ return localStorage.getItem(LAST_SYNCED_AT_KEY) || EPOCH_ISO; }catch(e){ return EPOCH_ISO; }
+}
+function setLastSyncedAt(iso){
+  try{ localStorage.setItem(LAST_SYNCED_AT_KEY, iso); }catch(e){}
+}
+// 換雲端網址／還原備份這兩個動作，都代表「對方（新網址的後端，或還原前的雲端狀態）
+// 不一定擁有本機現在這份資料的歷史」，這時候保守起見強制整包重新送一次（把水位
+// 退回EPOCH_ISO），不要冒險漏送，之後才繼續用delta。
+function resetLastSyncedAt_(){
+  try{ localStorage.removeItem(LAST_SYNCED_AT_KEY); }catch(e){}
+}
+// 把目前db拆成「要送出去的這包」：items/suppliers/orders/priceLog/actionLog這5個
+// 會隨時間一直長大的陣列，只挑「比上次成功同步時間點更新」的部分；其他全部欄位
+// （accounts/settings/cart/cartUpdatedAt/lastOrderBySupplier/刪除墓碑/license/
+// currentRole...）體積本來就小、不是效能瓶頸，維持整包送出，邏輯最簡單也最安全。
+const DELTA_ARRAY_FIELDS_ = { items:'updatedAt', suppliers:'updatedAt', orders:'updatedAt', priceLog:'timeISO', actionLog:'time' };
+function buildDeltaPayload_(sinceISO){
+  const since = sinceISO || EPOCH_ISO;
+  const payload = Object.assign({}, db);
+  Object.keys(DELTA_ARRAY_FIELDS_).forEach(key=>{
+    const field = DELTA_ARRAY_FIELDS_[key];
+    payload[key] = (db[key]||[]).filter(r => ((r && r[field]) || EPOCH_ISO) > since);
+  });
+  return payload;
+}
+const ROLES = ['維護專員','管理者','叫貨者','營運(唯讀)'];
+const LEGACY_ROLE_MAP = {'店經理':'叫貨者','採購':'叫貨者','後台驗收':'叫貨者','預備人員':'叫貨者'}; // 舊角色名稱自動對應到新角色
+/* 權限分三層：
+   isMaintainer＝系統維護方（晨諾創意，Barbara專用），帳號管理／雲端同步／授權收費／背景圖案／一鍵匯入 只有這層能動
+   isStoreAdmin＝店家管理者（Eva），可以管供應商／品項／店名等「店家營運」內容，但動不到上面那層
+   isReadonly＝唯讀，什麼都不能改
+   叫貨者＝只能下單／驗收／盤點 */
+function isMaintainer(){ return !!currentAccount && currentAccount.role === '維護專員'; }
+function isStoreAdmin(){ return !!currentAccount && (currentAccount.role === '維護專員' || currentAccount.role === '管理者'); }
+
+let db = loadDB();
+let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
+let cloudSyncTimer = null;
+
+const APP_VERSION = '2026.10.28-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
+// ===== 2026-10-14新增：雲端存取代碼 =====
+// 以前後端網址只要被人知道，不用登入就能直接讀走整個資料庫（含帳號清單）。
+// 現在後端多一道「店家代碼」：每台裝置第一次使用輸入一次，之後自動帶上。
+// 做法：包一層fetch，只要是送去雲端網址的請求，GET就在網址加 ?t=代碼，POST就在內容最前面加 "__t"。
+// 後端回 needAuth 時，自動跳出輸入代碼的視窗。
+const ACCESS_TOKEN_KEY = 'kaokaozhu_access_token_v1';
+function getAccessToken_(){ try{ return localStorage.getItem(ACCESS_TOKEN_KEY)||''; }catch(e){ return ''; } }
+function setAccessToken_(t){ try{ localStorage.setItem(ACCESS_TOKEN_KEY, String(t||'').trim()); }catch(e){} }
+// 2026-10-20 改版（Barbara定案的原則：代碼只在「打開App、這台裝置第一次使用」時問一次，
+// 是綁定裝置用的；進門之後的任何操作——下單、結帳、收貨——都「絕對不可以」跳出代碼框打斷店員）。
+// 10/18版的錯：任何一個雲端回應說「需要代碼」就跳框，包括輸入代碼之前就已經送出、晚一點才回來的舊請求，
+// 造成結帳時一直跳、輸入十幾次。現在：
+//  1) 跳框只發生在 initApp() 開門時（ensureAccessTokenAtEntry_）。
+//  2) 操作中如果雲端真的說代碼無效：不跳框，資料照樣安全存在手機，只在狀態列／紅色提示列顯示
+//     「這台裝置需要重新輸入店家代碼」＋一個小按鈕，店員方便時自己點；下次打開App也會在門口問。
+//  3) 用「舊代碼／沒帶代碼」送出的請求晚回來說需要代碼，一律忽略，不影響任何畫面。
+let gasOrigFetch_ = null;
+let authNeedsReentry_ = false;   // 雲端確認「目前這組代碼無效」→ 只顯示提示，不打斷
+let tokenEntryResolve_ = null;   // 開門時等待代碼輸入完成用
+(function installGasFetchWrapper_(){
+  const origFetch = window.fetch.bind(window);
+  gasOrigFetch_ = origFetch;
+  window.fetch = function(input, init){
+    let g = '';
+    try{ g = getGasUrl(); }catch(e){}
+    if(g && typeof input==='string' && input===g){
+      const t = getAccessToken_();
+      if(t){
+        if(init && init.method==='POST' && typeof init.body==='string' && init.body.charAt(0)==='{'){
+          init = Object.assign({}, init, { body: '{"__t":' + JSON.stringify(t) + (init.body.length>2 ? ',' : '') + init.body.slice(1) });
+        } else if(!init || !init.method || init.method==='GET'){
+          input = g + (g.indexOf('?')>=0 ? '&' : '?') + 't=' + encodeURIComponent(t);
+        }
+      }
+      return origFetch(input, init).then(r=>{
+        try{ r.clone().json().then(j=>{
+          if(j && j.needAuth){
+            // 只有「用目前這組代碼」送出去還被拒絕，才算代碼真的無效；舊請求晚回來的一律忽略
+            if(t && t === getAccessToken_()) markAuthNeedsReentry_();
+            else if(!t) markAuthNeedsReentry_();
+          } else if(j && j.ok && t && t === getAccessToken_() && authNeedsReentry_){
+            authNeedsReentry_ = false; updateAuthNotice_();
+          }
+        }).catch(()=>{}); }catch(e){}
+        return r;
+      });
+    }
+    return origFetch(input, init);
+  };
+})();
+// 2026-10-21：收到「需要代碼」不馬上相信——先用目前的代碼直接問雲端一次，確定真的錯了才顯示提示。
+// （避免任何偶發狀況讓店員看到「輸入代碼」，又被打斷一次）
+let authVerifyInFlight_ = null;
+let lastPullNeedAuth_ = false;
+function setAuthNeeded_(){
+  authNeedsReentry_ = true;
+  lastSyncErrorReason_ = '這台裝置需要重新輸入店家代碼';
+  updateAuthNotice_();
+}
+function markAuthNeedsReentry_(){
+  if(authNeedsReentry_) return;
+  const t = getAccessToken_();
+  if(!t){ setAuthNeeded_(); return; }
+  if(authVerifyInFlight_) return;
+  authVerifyInFlight_ = verifyTokenRaw_(t).then(r=>{
+    authVerifyInFlight_ = null;
+    if(r === 'bad' && t === getAccessToken_()) setAuthNeeded_();
+  });
+}
+// 狀態列與紅色提示列的「輸入代碼」小按鈕：不跳框、不擋操作，店員方便時自己點
+function updateAuthNotice_(){
+  const link = document.getElementById('tokenFixLink');
+  if(link) link.style.display = authNeedsReentry_ ? '' : 'none';
+  try{ updatePendingSyncBanner_(); }catch(e){}
+}
+function openTokenModalByUser_(){ showAccessTokenModal_(false); }
+// 開門時：還沒輸入過代碼 → 在登入畫面之前問一次，等輸入正確才往下走
+function promptTokenAtEntry_(wrong){
+  return new Promise(resolve=>{ tokenEntryResolve_ = resolve; showAccessTokenModal_(wrong); });
+}
+async function verifyTokenRaw_(t){
+  // 直接問雲端這組代碼對不對（不經過上面的包裝，不會觸發任何提示）。回傳 'ok' | 'bad' | 'net'
+  const g = getGasUrl(); if(!g) return 'ok';
+  try{
+    const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const timer = setTimeout(()=>{ try{ ctrl && ctrl.abort(); }catch(e){} }, 15000);
+    const r = await gasOrigFetch_(g + (g.indexOf('?')>=0?'&':'?') + 't=' + encodeURIComponent(t), ctrl?{signal:ctrl.signal}:undefined);
+    clearTimeout(timer);
+    const j = await r.json();
+    if(j && j.needAuth) return 'bad';
+    return (j && j.ok) ? 'ok' : 'net';
+  }catch(e){ return 'net'; }
+}
+async function ensureAccessTokenAtEntry_(){
+  if(!getGasUrl()) return;
+  if(getAccessToken_()) return; // 已綁定過的裝置：完全不問
+  await promptTokenAtEntry_(false);
+}
+function showAccessTokenModal_(wrong){
+  let m = document.getElementById('tokenModal');
+  if(!m){
+    m = document.createElement('div');
+    m.id = 'tokenModal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    m.innerHTML = '<div style="background:#fff;border-radius:16px;padding:22px 20px;max-width:340px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);">'
+      + '<div style="font-size:18px;font-weight:700;margin-bottom:6px;">🔑 請輸入店家代碼</div>'
+      + '<div id="tokenModalMsg" style="font-size:13px;color:#666;line-height:1.6;margin-bottom:12px;"></div>'
+      + '<input id="tokenModalInput" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" inputmode="text" placeholder="貼上或輸入代碼" onkeydown="if(event.key===\'Enter\')submitAccessToken_()" style="width:100%;box-sizing:border-box;padding:12px;font-size:16px;border:1px solid #ccc;border-radius:10px;">'
+      + '<button id="tokenModalBtn" onclick="submitAccessToken_()" style="width:100%;margin-top:12px;padding:13px;font-size:16px;font-weight:700;border:0;border-radius:10px;background:var(--brand,#c0392b);color:#fff;">確認</button>'
+      + '<div id="tokenModalLater" style="display:none;text-align:center;margin-top:10px;"><span onclick="closeTokenModal_()" style="font-size:13px;color:#666;text-decoration:underline;">先不要，繼續操作</span></div>'
+      + '<div style="font-size:11px;color:#999;margin-top:10px;text-align:center;">沒有代碼？請向店長或維護人員索取</div></div>';
+    document.body.appendChild(m);
+  }
+  const msg = document.getElementById('tokenModalMsg');
+  if(msg){
+    msg.innerHTML = wrong
+      ? '<span style="color:#c0392b;font-weight:700;">代碼不正確，請再確認一次（注意不要多打空格）。</span>'
+      : '這台裝置第一次使用，請輸入店長給您的代碼，<b>只需要輸入一次</b>，之後打開就不會再問。';
+  }
+  // 開門時（等待中）不能略過；操作中由店員自己點開的，可以「先不要」
+  const later = document.getElementById('tokenModalLater');
+  if(later) later.style.display = tokenEntryResolve_ ? 'none' : '';
+  m.style.display = 'flex';
+  setTimeout(()=>{ const i=document.getElementById('tokenModalInput'); if(i) i.focus(); }, 50);
+}
+function closeTokenModal_(){ const m = document.getElementById('tokenModal'); if(m) m.style.display = 'none'; }
+async function submitAccessToken_(){
+  const i = document.getElementById('tokenModalInput');
+  // 全形英數字自動轉半形、去掉所有空白（手機中文輸入法常常打成全形）
+  const v = i ? String(i.value||'').replace(/[！-～]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/\s+/g,'') : '';
+  if(!v){ return; }
+  const btn = document.getElementById('tokenModalBtn');
+  if(btn){ btn.disabled = true; btn.textContent = '確認中…'; }
+  const r = await verifyTokenRaw_(v);
+  if(btn){ btn.disabled = false; btn.textContent = '確認'; }
+  if(r === 'bad'){ showAccessTokenModal_(true); return; }
+  // 'ok'，或網路暫時不通（先存起來，連上後自動生效，不讓店員卡在門口）
+  setAccessToken_(v);
+  if(i) i.value = '';
+  closeTokenModal_();
+  authNeedsReentry_ = false;
+  lastSyncErrorReason_ = '';
+  updateAuthNotice_();
+  if(tokenEntryResolve_){ const f = tokenEntryResolve_; tokenEntryResolve_ = null; f(); return; }
+  showToast(r==='ok' ? '代碼已確認' : '已記住代碼，連上網路後會自動同步');
+  // 操作中補輸入代碼後：補送手機裡還沒送出的資料（含被打斷的訂單），不用店員重做
+  pullFromCloud(false).then(()=>{ if(window.__pendingCheckoutOrders) attemptCheckoutPush_(); });
+}
+function getGasUrl(){
+  const stored = localStorage.getItem(GAS_URL_KEY);
+  if(stored===null) return DEFAULT_GAS_URL; // 從未設定過，用內建預設值
+  return stored; // 使用者自己存過（可能是別的網址，也可能是主動清空的空字串）
+}
+function setGasUrl(url){
+  // 只有維護專員能改雲端同步網址：這個網址一旦被換掉，之後所有訂單/帳號/庫存資料
+  // 都會同步到新網址去，等於資料外洩或直接失聯，風險等同帳密外流，務必守住。
+  if(!isMaintainer()) return;
+  localStorage.setItem(GAS_URL_KEY, url.trim());
+  // 換了網址＝對方（新後端）不一定擁有本機資料的同步歷史，水位退回最早，
+  // 強制下一次push整包送出，不要冒險漏送。
+  resetLastSyncedAt_();
+}
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return seedDB();
+}
+// 2026-10-01新增：統一操作紀錄。前台任何「新增／修改／刪除／狀態變更」的動作，
+// 呼叫這個函式記一筆進db.actionLog（誰、什麼時候、做了什麼、對象、內容摘要），
+// 之後跟著正常的push流程一起送到後台，後端append進「操作紀錄」分頁，永久留痕。
+// action: 中文動作名稱（新增品項／刪除品項／下單／收貨確認…）
+// target: 這個動作是對誰做的（供應商名稱／訂單編號…）
+// summary: 一句話內容摘要
+function logAction(action, target, summary){
+  const who = currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入';
+  db.actionLog.push({
+    id: 'log'+Date.now()+Math.floor(Math.random()*10000),
+    time: nowISO(),
+    account: who,
+    action,
+    target: target||'',
+    summary: summary||'',
+  });
+}
+function saveDB(){
+  try{
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    setSyncStatus('local');
+  }catch(e){
+    setSyncStatus('error');
+  }
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){} // 標記「這筆異動還沒送到雲端」，成功push後才清掉
+  localChangeVersion++; // 記一筆「本機又變了」，push完成時用來判斷這次送出的是不是最新版本
+  queueCloudSync();
+}
+// 2026-10-14新增：同步失敗的「原因」。之前失敗只顯示一句「雲端同步失敗」，店家看不懂
+// 是網路問題還是系統問題。這裡把原因轉成白話，顯示在同步狀態文字上。
+let lastSyncErrorReason_ = '';
+function friendlySyncReason_(res, err){
+  const msg = String((res && (res.error||res.message)) || (err && err.message) || '');
+  // 2026-10-21：雲端處理太久時，回來的是一張錯誤網頁、不是資料，瀏覽器的錯誤訊息裡剛好有英文字「token」，
+  // 以前被誤判成「代碼不正確」，害店員一直被叫去輸入代碼。這種情況其實資料多半已經存進去了。
+  if(/Unexpected token|not valid JSON|<!DOCTYPE|JSON\.parse|SyntaxError/i.test(msg)) return '雲端回應較慢，資料已存在手機，會自動確認';
+  if(res && res.needAuth) return '這台裝置需要重新輸入店家代碼';
+  if(/資料量|50000|50,000|上限|limit/i.test(msg)) return '雲端資料量已達上限，請聯絡維護人員';
+  if(/lock|忙線|busy|逾時|timeout/i.test(msg)) return '雲端忙線中，稍後會自動重試';
+  if(/存取代碼|\(auth\)|unauthor/i.test(msg)) return '這台裝置需要重新輸入店家代碼';
+  if(err) return '網路不穩或已離線，連線後會自動補送';
+  return msg ? '雲端回報異常，稍後會自動重試' : '原因不明，稍後會自動重試';
+}
+function setSyncStatus(mode){
+  // mode: 'local' | 'synced' | 'syncing' | 'error' | 'offline'
+  const dot = document.getElementById('syncDot');
+  const text = document.getElementById('syncText');
+  if(!dot||!text) return;
+  const map = {
+    local:   {cls:'', label:'資料已存於本機'},
+    synced:  {cls:'', label:'已同步至雲端（多人共用）'},
+    syncing: {cls:'off', label:'同步中…'},
+    error:   {cls:'off', label:'雲端同步失敗，暫存本機' + (lastSyncErrorReason_ ? '（'+lastSyncErrorReason_+'）' : '')},
+    offline: {cls:'off', label:'尚未設定雲端同步，僅本機儲存'},
+  };
+  const m = map[mode]||map.local;
+  dot.className = 'sync-dot' + (m.cls?' '+m.cls:'');
+  text.textContent = m.label;
+  updatePendingSyncBanner_();
+}
+// 2026-10-02新增：統一在這裡判斷「要不要顯示強制警示banner」，只看PENDING_SYNC_KEY
+// 這個唯一的真相來源（跟beforeunload防呆用的是同一個判斷依據），不管是saveDB()、
+// push成功/失敗、背景定期同步...任何地方呼叫setSyncStatus()都會自動更新，不用每個
+// 呼叫點各自記得去開關banner、容易漏掉。
+// 2026-10-20：紅色提示列不再「每存一次就閃一次」——正常情況下送出只要1~3秒，閃一下又消失
+// 只會讓畫面跳動、害店員按錯。改成：異動超過8秒還沒送達、或上次同步失敗、或App剛打開就發現
+// 上次有沒送出的資料，才顯示（品饌事故要的「卡住一定看得到」保護完全保留）。
+// 另外紅色提示列改成浮在最上層（position:fixed），出現/消失都不會推擠下面的畫面。
+let pendingSince_ = null;
+let pendingBannerTimer_ = null;
+let pendingBannerForceShow_ = true; // App剛打開時，上次遺留的未送出資料要立刻提示
+function updatePendingSyncBanner_(){
+  const banner = document.getElementById('pendingSyncBanner');
+  if(!banner) return;
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  const txt = document.getElementById('pendingSyncText');
+  const btn = document.getElementById('pendingSyncBtn');
+  if(!hasPending){
+    pendingSince_ = null; pendingBannerForceShow_ = false;
+    clearTimeout(pendingBannerTimer_);
+    banner.classList.remove('show');
+    return;
+  }
+  if(!pendingSince_) pendingSince_ = Date.now();
+  const failed = /失敗/.test((document.getElementById('syncText')||{}).textContent||'');
+  const show = pendingBannerForceShow_ || authNeedsReentry_ || failed || (Date.now()-pendingSince_ > 8000);
+  if(txt) txt.textContent = authNeedsReentry_
+    ? '⚠️ 這台裝置需要重新輸入店家代碼，資料已安全存在手機裡'
+    : '⚠️ 有資料尚未確認送達雲端，請勿關閉App，正在自動重試…';
+  if(btn) btn.textContent = authNeedsReentry_ ? '輸入代碼' : '立即重試';
+  banner.classList.toggle('show', show);
+  if(!show){ clearTimeout(pendingBannerTimer_); pendingBannerTimer_ = setTimeout(updatePendingSyncBanner_, 8200); }
+}
+function pendingBannerAction_(){ if(authNeedsReentry_) openTokenModalByUser_(); else manualRetrySync(); }
+// 2026-10-02新增：成功同步的正向提示——之前「沒跳紅色=應該沒事」是一種消極、
+// 容易被誤判的判斷方式（今晚的事故正是因為沒有明顯提示讓人發現失敗，但反過來說，
+// 平常「成功」也同樣沒有明顯提示，只能靠「沒看到紅色」去推論，不夠踏實）。
+// 下單送出、收貨確認這兩個「客戶輸入」最關鍵的動作，一律主動顯示；其他背景
+// 自動儲存（改設定、改單價…）只有在「剛剛才從卡住的紅色警示恢復過來」時才顯示，
+// 避免每打一個字都跳一次、反而變成干擾。3秒後自動收合，不用使用者手動關閉。
+let syncSuccessBannerTimer_ = null;
+function showSyncSuccessBanner_(message){
+  const banner = document.getElementById('syncSuccessBanner');
+  if(!banner) return;
+  banner.textContent = '✅ ' + (message || '資料已確認送達雲端');
+  banner.classList.add('show');
+  clearTimeout(syncSuccessBannerTimer_);
+  syncSuccessBannerTimer_ = setTimeout(()=>{ banner.classList.remove('show'); }, 3000);
+}
+// 讓使用者在banner上可以自己手動催一次重試，不用乾等背景同步（最長可能要等到
+// 下次切回分頁或3分鐘定期同步才會自動補送）。
+function manualRetrySync(){
+  if(!getGasUrl()){ return; }
+  showToast('正在重新送出…');
+  pullFromCloud(false); // pullFromCloud內部本來就會判斷hasPendingLocalChanges並自動補送push，邏輯共用不重寫一份
+}
+let cloudPushInFlight = false; // push還沒送完（GET偷看雲端 + POST送出）的這段期間设為true，
+                                // 讓背景定期同步（見檔案最後的setInterval）知道「現在有一次push還沒完成」，
+                                // 不要在這個空檔又跑一次pull把還沒送出去的本機資料蓋掉。
+let cloudPushPending = false;  // 如果上一次push還沒送完，這段期間又有新的變更要送，先排隊，
+                                // 不要跟正在進行中的那一次同時打去雲端（避免兩個GET+POST交錯，順序亂掉）。
+function queueCloudSync(){
+  const url = getGasUrl();
+  if(!url) { setSyncStatus('offline'); return; }
+  clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = setTimeout(()=>{
+    cloudSyncTimer = null; // 計時器已經觸發，清掉旗標，讓背景定期同步知道「現在沒有排隊中的本機變更」
+    pushToCloud();
+  }, 900); // 稍微延遲，避免連續操作觸發太多次
+}
+function pushToCloud(){
+  const url = getGasUrl();
+  if(!url) return;
+  if(cloudPushInFlight){ cloudPushPending = true; return; } // 上一次還沒送完，先排隊，等它結束後自動補一次
+  cloudPushInFlight = true;
+  setSyncStatus('syncing');
+  doPushToCloud();
+}
+// 2026-10-01新增：後端GAS改版後，合併邏輯搬到雲端做（讀現況→合併→寫回→直接把合併完
+// 的最終結果回傳），前端只要POST一次就好，不用再自己先GET偷看一次雲端現況、自己合併、
+// 再POST——少一次來回，速度大概可以快一半（原本GET+POST兩趟要5秒多，現在一趟POST）。
+// 這個函式是「單純送一次」的最小單位，回傳Promise<boolean>：
+//   true＝確定送達雲端，而且本機db已經套用雲端合併完的最終結果
+//   false＝沒送成功（網路問題、雲端忙線中等），本機db維持原樣不變，呼叫端要自己決定要不要重試
+// 下單結帳（confirmCheckout）會直接await這個函式，等到true才會顯示「完成」、才能分享LINE。
+// lastPushRemoteData：記錄「最近一次push、伺服器實際回傳的合併結果」，給結帳流程
+// 二次驗證用——不能用push完之後的db.orders來驗證，因為db現在是「合併」而不是
+// 整包蓋掉（見下方說明），本機早就知道自己剛加的訂單，merge完db.orders一定找得到，
+// 這樣驗證不出「伺服器那邊是不是真的也收到了」，一定要看伺服器原始回應才算數。
+let lastPushRemoteData = null;
+let versionAtLastPushStart = -1; // 這次push開始「送出當下」的localChangeVersion，
+                                   // push完成時拿現在的版本號比對，判斷這段期間有沒有新異動插進來
+async function pushOnce_(){
+  const url = getGasUrl();
+  if(!url) return false;
+  lastPushRemoteData = null; // 每次呼叫一開始先清掉，避免這次其實走舊版相容路徑
+                              // （沒有res.data），卻誤用上一次成功的舊資料去驗證這一次
+  versionAtLastPushStart = localChangeVersion;
+  // 2026-10-02新增：這裡「拍照」的時間點，就是這次payload裡「比這個時間點更新」的
+  // 篩選基準，也是這次送出成功後水位要往前推進到的新時間點——兩者必須是同一個時間，
+  // 不能分別取「現在」兩次，否則篩選範圍跟水位會對不上，可能漏送掉中間這段時間的異動。
+  const deltaCaptureTime_ = nowISO();
+  const payload_ = buildDeltaPayload_(getLastSyncedAt());
+  try{
+    const r = await fetch(url, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'}, // 避免觸發CORS預檢，GAS不支援OPTIONS
+      body: JSON.stringify(payload_), // 2026-10-02改為只送「上次成功同步之後有異動」的部分（delta），
+                                        // 不再是JSON.stringify(db)整包——後端mergeDb_()本來就是
+                                        // 聯集＋比新舊時間，沒送到的部分會直接沿用雲端現有版本，
+                                        // 不會不見；詳見上面buildDeltaPayload_的說明。
+    });
+    const res = await r.json();
+    if(!res || !res.ok){ lastSyncErrorReason_ = friendlySyncReason_(res, null); return false; }
+    lastSyncErrorReason_ = '';
+    if(res.data){
+      // 2026-10-01抓到的真正根因：這裡原本是「db = JSON.parse(res.data)」整包蓋掉。
+      // 如果這次push送出之後、回應還沒回來之前這段期間（2-6秒），本機又因為別的
+      // 原因新增了資料（最典型：結帳時剛好有一個更早、還在background排隊中的push
+      // 同時在跑，等它的回應回來時，結帳剛加進db.orders的新訂單還沒被送出去），
+      // 整包蓋掉就會把這段期間新增的東西洗掉——這就是品饌訂單消失的真正原因。
+      // 改成跟pull/legacy路徑同一套「合併」（mergeRemoteIntoLocal，id+時間戳記判斷），
+      // 不管這個回應跟本機最新狀態誰先誰後，都只會「補上雲端有、本機沒有的」，
+      // 不會把本機這段期間新增的東西洗掉。
+      const remote = JSON.parse(res.data);
+      lastPushRemoteData = remote; // 存起來給結帳的二次驗證用，驗證要看「伺服器真的回了什麼」
+      mergeRemoteIntoLocal(remote);
+      try{ setTimeout(()=>onCloudOrdersConfirmed_((remote.orders||[]).map(o=>o.id)), 0); }catch(e){}
+      normalizeDbShape();
+      sortByTimeFieldDesc(db.orders, 'createdAtISO');
+      sortByTimeFieldDesc(db.priceLog, 'timeISO');
+      saveDBLocalOnly();
+      // 伺服器確認收到了「拍照那一刻之前的異動」，水位往前推進到那個時間點——不是「現在」，
+      // 因為網路來回這幾秒之間，本機可能又有新異動發生，那些要留給下一次delta送出，
+      // 不能因為這次成功就誤判「全部都到齊了」而漏送。
+      setLastSyncedAt(deltaCaptureTime_);
+      return true;
+    }
+    // 相容舊版後端（還沒更新GAS程式碼、回應沒有data欄位）：退回舊式兩段式做法，
+    // 確保前後端其中一邊還沒更新完成的過渡期間不會壞掉。
+    return await legacyGetMergePost_();
+  }catch(e){
+    lastSyncErrorReason_ = friendlySyncReason_(null, e);
+    return false; // 網路問題、逾時等，呼叫端自行決定要不要重試
+  }
+}
+// 舊版相容：GET偷看雲端現況→前端合併→再POST送出（跟2026-10-01之前的pushToCloud邏輯相同）
+async function legacyGetMergePost_(){
+  const url = getGasUrl();
+  try{
+    const r = await fetch(url);
+    const res = await r.json();
+    if(res && res.ok && res.data){
+      const remote = JSON.parse(res.data);
+      mergeRemoteIntoLocal(remote);
+    }
+  }catch(e){ /* 雲端現況讀不到或格式異常，不影響原本要送出的本機資料 */ }
+  try{
+    const r2 = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(db),
+    });
+    const res2 = await r2.json();
+    return !!(res2 && res2.ok);
+  }catch(e){ return false; }
+}
+// 2026-10-01 修正：這一段原本分別寫在pushToCloud()（push前偷看雲端合併）跟
+// pullFromCloud()（直接db=remote整包蓋掉）兩個地方，邏輯不一致。事故成因：
+// 手機瀏覽器切到LINE分享訂單時常常會把分頁背景化甚至整個reload，導致剛送出的
+// 訂單那一次push還沒真的送到雲端就被中斷；使用者回到系統時initApp()一定會先
+// pullFromCloud()，舊版那裡是「整包蓋掉」，就把這筆還沒送出去、只存在本機的
+// 新訂單直接洗掉、永遠消失（品饌供應商那張單就是這樣不見的）。
+// 修正方式：pull跟push共用同一套「合併」邏輯（id+時間戳記+刪除墓碑），不管是
+// push前偷看雲端、還是pull整包拉回來，都不會用雲端資料「蓋掉」本機還沒送出去
+// 的異動，只會合併取較新的一份。
+function mergeRemoteIntoLocal(remote){
+  if(Array.isArray(remote.accounts)){
+    const localIds = new Set(db.accounts.map(a=>a.id));
+    const localNames = new Set(db.accounts.map(a=>(a.account||'').toLowerCase()));
+    remote.accounts.forEach(ra=>{
+      if(!localIds.has(ra.id) && !localNames.has((ra.account||'').toLowerCase())){
+        db.accounts.push(ra);
+        localIds.add(ra.id); localNames.add((ra.account||'').toLowerCase());
+      }
+    });
+  }
+  if(Array.isArray(remote.items)){
+    const r = mergeRecordsWithTombstones(db.items, remote.items, db.deletedItemIds, remote.deletedItemIds);
+    db.items = r.merged; db.deletedItemIds = r.tombstones;
+  }
+  if(Array.isArray(remote.suppliers)){
+    const r = mergeRecordsWithTombstones(db.suppliers, remote.suppliers, db.deletedSupplierIds, remote.deletedSupplierIds);
+    db.suppliers = r.merged; db.deletedSupplierIds = r.tombstones;
+  }
+  if(Array.isArray(remote.orders)){
+    // 2026-10-01：訂單原本是「只會新增不會刪除」，改成跟品項/供應商一樣用墓碑機制，
+    // 因為新增了管理員刪單功能（刪除測試訂單等情境），要支援刪除才能正確同步到多裝置。
+    const r = mergeRecordsWithTombstones(db.orders, remote.orders, db.deletedOrderIds, remote.deletedOrderIds);
+    db.orders = r.merged; db.deletedOrderIds = r.tombstones;
+    sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 維持新到舊排序（畫面「最近10筆」等依此排序）
+  }
+  if(Array.isArray(remote.priceLog)){
+    db.priceLog = mergeAppendOnlyById(db.priceLog, remote.priceLog, 'timeISO');
+    sortByTimeFieldDesc(db.priceLog, 'timeISO'); // 維持新到舊排序（畫面「最近30筆」依此排序）
+  }
+  if(Array.isArray(remote.actionLog)){
+    db.actionLog = mergeAppendOnlyById(db.actionLog, remote.actionLog, 'time');
+    sortByTimeFieldDesc(db.actionLog, 'time');
+  }
+  if(remote.settings && typeof remote.settings==='object'){
+    if((remote.settings.updatedAt||EPOCH_ISO) > (db.settings.updatedAt||EPOCH_ISO)){
+      db.settings = remote.settings;
+      normalizeDbShape(); // 對方的settings可能是還沒升級過的舊格式，補齊欄位避免畫面顯示異常
+    }
+  }
+  // 2026-10-18：購物車改成「每家供應商各自比較時間」合併（內場/外場同時打不同供應商不再互蓋）。
+  // 規則跟後台mergeDb_完全同一套（mergeCartBySupplier_），不要只改一邊。
+  if(remote.cart && typeof remote.cart==='object'){
+    const r = mergeCartBySupplier_(db, remote);
+    db.cart = r.cart; db.cartUpdatedAtBySupplier = r.map; db.cartUpdatedAt = r.cartUpdatedAt;
+  }
+  if(remote.lastOrderBySupplier && typeof remote.lastOrderBySupplier==='object'){
+    db.lastOrderBySupplier = Object.assign({}, remote.lastOrderBySupplier, db.lastOrderBySupplier);
+  }
+}
+function doPushToCloud(){
+  const url = getGasUrl();
+  if(!url){ cloudPushInFlight = false; cloudPushPending = false; return; } // 極端情況：push送到一半網址被清空，也要記得解除旗標，不然背景同步會永遠卡住
+  const versionBeforeThisCall = localChangeVersion;
+  pushOnce_().then(success=>{
+    setSyncStatus(success ? 'synced' : 'error');
+    if(success){
+      // 只有「送出去之後，版本號都沒再變過」才代表現在雲端拿到的就是本機最新狀態，
+      // 才能清掉旗標。如果這段期間又有別的異動插進來（不管是不是同一個地方），
+      // 旗標要繼續留著，而且要再補送一次，不然新的那筆異動會變成「沒人知道還沒送出」。
+      if(localChangeVersion === versionBeforeThisCall){
+        try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+        updatePendingSyncBanner_(); // 2026-10-02：上面setSyncStatus()已經先跑過一次了，
+                                     // 那時候PENDING_SYNC_KEY還沒清掉，banner會抓到舊狀態，
+                                     // 這裡清掉之後要再手動刷新一次，不然警示會卡著不消失
+        if(currentAccount) showSyncSuccessBanner_(); // 每一筆改動（下單以外，例如收貨確認、改品項、改設定）確實送達雲端都主動告知，不要只靠「沒跳紅色」去推論
+      } else {
+        queueCloudSync(); // 還有更新的異動沒送到，馬上排一次補送
+      }
+      // 雲端合併回來的最終結果（帳號/品項/供應商/訂單/設定）畫面要跟著更新，不然會顯示跟資料庫兜不起來的舊畫面
+      if(currentAccount){ renderAll(); renderAccountManage(); applySettings(); }
+    }
+  }).finally(()=>{
+    cloudPushInFlight = false; // 不管成功失敗，這次push都結束了，背景定期同步可以恢復
+    if(cloudPushPending){ cloudPushPending = false; pushToCloud(); } // 排隊中還有新變更，馬上補送一次
+  });
+}
+function pullFromCloud(showMsg){
+  const url = getGasUrl();
+  if(!url){ if(showMsg) showToast('尚未設定雲端網址'); return Promise.resolve(); }
+  setSyncStatus('syncing');
+  const tokenUsed_ = getAccessToken_();
+  const pullStartISO_ = nowISO();
+  return fetch(url).then(r=>r.json()).then(res=>{
+    lastPullNeedAuth_ = !!(res && res.needAuth && tokenUsed_ === getAccessToken_());
+    if(lastPullNeedAuth_) markAuthNeedsReentry_();
+    if(res && res.ok && res.data){
+      try{
+        const remote = JSON.parse(res.data);
+        try{ setTimeout(()=>onCloudOrdersConfirmed_((remote.orders||[]).map(o=>o.id)), 0); }catch(e){}
+        let hasPendingLocalChanges = false;
+        try{ hasPendingLocalChanges = !!localStorage.getItem(PENDING_SYNC_KEY); }catch(e){}
+        if(hasPendingLocalChanges){
+          // 本機有異動還沒成功送到雲端過（例如剛建立訂單、手機切去LINE分享時分頁被系統
+          // 中斷或整個重新整理，push還沒送完）。絕對不能這時候直接拿雲端資料整包蓋掉
+          // 本機——這正是品饌那張單消失的原因。改成跟push前一樣的合併邏輯（id+時間戳記+
+          // 刪除墓碑），本機這筆還沒送出去的異動留著，再補送一次把它真的送上雲端。
+          mergeRemoteIntoLocal(remote);
+        } else {
+          // 本機沒有待送出的異動，單純拿雲端最新狀態為準（例如全新裝置第一次打開，
+          // 這裡直接整包覆蓋，避免內建示範資料殘留跟真實資料混在一起）。
+          db = remote;
+          // 2026-10-21：手機資料＝雲端資料，記下這個時間點。之後送出只送「這之後有變動」的部分。
+          // 以前新裝置（或LINE／Safari各自的空間）第一次送出會把整包資料（200多KB）全送，雲端要處理很久。
+          setLastSyncedAt(pullStartISO_);
+        }
+        normalizeDbShape(); // 雲端資料可能是還沒升級過的舊格式，缺deletedItemIds等新欄位的話下面migrate系列會直接壞掉，這裡先補齊
+        sortByTimeFieldDesc(db.orders, 'createdAtISO'); // 雲端資料可能是舊裝置整包蓋上去、沒排序過的，這裡重新排序，避免「最近幾筆」的畫面顯示錯亂
+        sortByTimeFieldDesc(db.priceLog, 'timeISO');
+        sortByTimeFieldDesc(db.actionLog, 'time');
+        saveDBLocalOnly();
+        if(hasPendingLocalChanges) queueCloudSync(); // 合併完本機還有異動沒送出去，馬上補送一次，確定真的到雲端
+        // 雲端拉回來的資料可能是別的裝置還沒跑過修正的舊格式（例如舊版供應商
+        // 名稱、舊角色名稱、意外重複的供應商），這裡每次從雲端整包蓋回本機
+        // 之後都重新跑一次修正，不只是開頁面第一次載入時才跑。
+        migrateHanjiSplit();
+        migrateRoles();
+        mergeDuplicateSuppliers();
+        applySettings();
+        if(currentAccount){ renderAll(); renderLicenseBanner(); renderLicenseGate(); }
+        setSyncStatus('synced');
+        if(showMsg) showToast('已從雲端載入最新資料');
+      }catch(e){ lastSyncErrorReason_ = '雲端資料格式異常'; setSyncStatus('error'); }
+    } else if(res && res.ok === false){
+      // 2026-10-14修正「假綠燈」：後端回報失敗（ok:false）時，以前也顯示「已同步」，
+      // 店家會以為資料沒問題。現在如實顯示失敗與原因。
+      lastSyncErrorReason_ = friendlySyncReason_(res, null);
+      setSyncStatus('error');
+      if(showMsg) showToast('雲端回報異常：' + lastSyncErrorReason_);
+    } else {
+      setSyncStatus('synced'); // 雲端還沒有資料（ok:true但沒有data），代表這是第一次，維持本機現有內容
+      if(showMsg) showToast('雲端尚無資料，將以目前本機資料為準');
+    }
+  }).catch((e)=>{ lastSyncErrorReason_ = friendlySyncReason_(null, e); setSyncStatus('error'); if(showMsg) showToast('雲端連線失敗'); });
+}
+function saveDBLocalOnly(){
+  try{ localStorage.setItem(DB_KEY, JSON.stringify(db)); }catch(e){}
+}
+
+function seedDB(){
+  const suppliers = [
+    {id:'s1', name:'綦盛號菜商', freq:12},
+    {id:'s2', name:'國豐商行有限公司', freq:9},
+    {id:'s3', name:'寶強', freq:6},
+    {id:'s4', name:'韓濟名味品有限公司-食材', freq:8},
+    {id:'s5', name:'佩森肉舖', freq:5},
+    {id:'s6', name:'源鮮農業', freq:4},
+    {id:'s7', name:'尚誠國際有限公司', freq:7},
+  ];
+  const items = [
+    {id:'i1', supplierId:'s1', code:'B02031', name:'雞胸骨', unit:'斤', price:12},
+    {id:'i2', supplierId:'s1', code:'B02062', name:'綠豆芽', unit:'斤', price:12},
+    {id:'i3', supplierId:'s1', code:'B02013', name:'金菇', unit:'包', price:14},
+    {id:'i4', supplierId:'s1', code:'B02017', name:'黃豆芽', unit:'斤', price:17},
+    {id:'i5', supplierId:'s2', code:'C02006', name:'米酒', unit:'瓶', price:15},
+    {id:'i6', supplierId:'s2', code:'C02001', name:'精鹽(台鹽)', unit:'1Kg/包', price:17},
+    {id:'i7', supplierId:'s3', code:'E01017', name:'龍頭牌5斤背心袋', unit:'包', price:30},
+    {id:'i8', supplierId:'s4', code:'OI299-24090037', name:'韓式專業豆腐條', unit:'塊', price:25},
+    {id:'i9', supplierId:'s5', code:'M001', name:'五花肉片', unit:'斤', price:180},
+    {id:'i10', supplierId:'s1', code:'V001', name:'高山高麗菜 (炸醬麵)', unit:'斤', price:35},
+  ];
+  return {
+    suppliers, items,
+    cart:{},              // {supplierId:{itemId:qty}}
+    orders:[],            // 送出後的訂單
+    priceLog:[],
+    lastOrderBySupplier:{},
+    currentRole: ROLES[0],
+    accounts: [
+      {id:'u1', account:'admin', password:'0000', role:'維護專員', name:'系統管理'},
+    ],
+    settings: { shopName:'燒酒烤烤豬', appSub:'叫貨系統', favicon:null, bgPattern:null },
+    license: {
+      activationDate: new Date().toISOString(),
+      trialDays: 7,
+      status: 'trial',            // trial | active | expired
+      paidThroughDate: null,      // ISO date，續約後才有值
+      setupFee: 8000, monthlyFee: 500, freeMonthsFirstYear: 6, billingCycle: '年繳',
+    },
+  };
+}
+// 「很久以前」的時間戳記，給補資料用：舊資料沒有updatedAt時，一律當成非常舊，
+// 這樣只要雲端或本機任一邊有真正的異動時間，就一定會贏過這個假的舊時間，不會誤判。
+const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
+function nowISO(){ return new Date().toISOString(); }
+
+// ---------- 2026-10-18：購物車「每家供應商各自」記時間戳 ----------
+// 改某家供應商的購物車（含清空）時，只更新那一家的時間；整包的cartUpdatedAt也一起更新，給舊版相容用。
+function touchCartSupplier_(sid){
+  const t = nowISO();
+  if(!db.cartUpdatedAtBySupplier || typeof db.cartUpdatedAtBySupplier!=='object') db.cartUpdatedAtBySupplier = {};
+  db.cartUpdatedAtBySupplier[sid] = t;
+  db.cartUpdatedAt = t;
+}
+// a＝本機（後台是「剛送來的」），b＝對方。逐家供應商比時間，較新者勝；一樣新留a。
+// 對方如果是舊版（沒有逐家時間），就用它整包的cartUpdatedAt當每一家的時間（相容舊版）。
+// ※後台 mergeDb_ 裡有一模一樣的一份，兩邊規則必須一致。
+function mergeCartBySupplier_(a, b){
+  const obj = v => (v && typeof v==='object') ? v : null;
+  const aCart = obj(a.cart)||{}, bCart = obj(b.cart)||{};
+  const aMap = obj(a.cartUpdatedAtBySupplier), bMap = obj(b.cartUpdatedAtBySupplier);
+  const tsOf = (map, whole, sid) => map ? (map[sid]||EPOCH_ISO) : (whole||EPOCH_ISO);
+  const ids = {};
+  [aCart, bCart, aMap||{}, bMap||{}].forEach(o=>Object.keys(o).forEach(k=>{ ids[k]=true; }));
+  const cart = {}, map = {};
+  Object.keys(ids).forEach(sid=>{
+    const at = tsOf(aMap, a.cartUpdatedAt, sid), bt = tsOf(bMap, b.cartUpdatedAt, sid);
+    const useB = bt > at;
+    const src = useB ? bCart : aCart;
+    if(src[sid] && typeof src[sid]==='object' && Object.keys(src[sid]).length) cart[sid] = Object.assign({}, src[sid]);
+    const ts = useB ? bt : at;
+    if(ts > EPOCH_ISO) map[sid] = ts;
+  });
+  const aw = a.cartUpdatedAt||EPOCH_ISO, bw = b.cartUpdatedAt||EPOCH_ISO;
+  return { cart, map, cartUpdatedAt: (bw > aw ? bw : aw) };
+}
+
+// 補齊db缺少的欄位，避免舊資料/匯入的備份檔缺欄位時，畫面渲染到一半直接壞掉。
+// 開機時跑一次，還原備份檔（importBackup）之後也要再跑一次，不能只在開機時跑。
+function normalizeDbShape(){
+  if(!db.settings) db.settings = { shopName:'燒酒烤烤豬', appSub:'叫貨系統', favicon:null, bgPattern:null };
+  if(db.settings.bgPattern===undefined) db.settings.bgPattern=null;
+  if(!db.settings.updatedAt) db.settings.updatedAt = EPOCH_ISO;
+  if(!db.license){
+    db.license = { activationDate:new Date().toISOString(), trialDays:7, status:'trial',
+      paidThroughDate:null, setupFee:8000, monthlyFee:500, freeMonthsFirstYear:6, billingCycle:'年繳' };
+  }
+  if(!db.accounts || !Array.isArray(db.accounts) || db.accounts.length===0){
+    db.accounts = [{id:'u1', account:'admin', password:'0000', role:'維護專員', name:'系統管理'}];
+  }
+  if(!Array.isArray(db.suppliers)) db.suppliers = [];
+  if(!Array.isArray(db.items)) db.items = [];
+  if(!Array.isArray(db.orders)) db.orders = [];
+  if(!Array.isArray(db.priceLog)) db.priceLog = [];
+  if(!Array.isArray(db.actionLog)) db.actionLog = []; // 2026-10-01新增：統一操作紀錄（誰、什麼時候、做了什麼），同步到後台試算表的「操作紀錄」分頁
+  if(!db.cart || typeof db.cart!=='object') db.cart = {};
+  if(!db.cartUpdatedAt) db.cartUpdatedAt = EPOCH_ISO;
+  // 2026-10-18：逐家供應商的購物車時間戳；舊資料沒有的話，用整包時間補給購物車裡現有的每一家
+  if(!db.cartUpdatedAtBySupplier || typeof db.cartUpdatedAtBySupplier!=='object'){
+    db.cartUpdatedAtBySupplier = {};
+    Object.keys(db.cart).forEach(sid=>{ db.cartUpdatedAtBySupplier[sid] = db.cartUpdatedAt; });
+  }
+  if(!db.lastOrderBySupplier || typeof db.lastOrderBySupplier!=='object') db.lastOrderBySupplier = {};
+  if(!db.currentRole) db.currentRole = ROLES[0];
+  // 多裝置合併同步要用的時間戳記／墓碑清單／唯一id，舊資料沒有的話在這裡補齊
+  if(!Array.isArray(db.deletedItemIds)) db.deletedItemIds = [];
+  if(!Array.isArray(db.deletedSupplierIds)) db.deletedSupplierIds = [];
+  if(!Array.isArray(db.deletedOrderIds)) db.deletedOrderIds = []; // 2026-10-01新增：刪除訂單的墓碑清單，同步時判斷「是不是已經被刪除」用
+  db.items.forEach(it=>{ if(!it.updatedAt) it.updatedAt = EPOCH_ISO; });
+  // 品項顯示順序改用sortIndex欄位排序（不再依賴陣列本身的排列順序，多裝置合併同步
+  // 才不會把手動排好的順序弄亂）。舊資料沒有sortIndex的話，照目前陣列裡的順序
+  // （也就是升級前畫面顯示的順序）依序補上，這樣升級當下畫面看起來完全不會變動。
+  {
+    const seenNext = {};
+    db.items.forEach(it=>{
+      if(it.sortIndex===undefined || it.sortIndex===null){
+        const sid = it.supplierId;
+        if(seenNext[sid]===undefined) seenNext[sid] = 1;
+        it.sortIndex = seenNext[sid]++;
+      }
+    });
+  }
+  db.suppliers.forEach(s=>{ if(!s.updatedAt) s.updatedAt = EPOCH_ISO; });
+  db.orders.forEach(o=>{ if(!o.updatedAt) o.updatedAt = o.createdAtISO || EPOCH_ISO; });
+  db.priceLog.forEach(l=>{
+    if(!l.id) l.id = 'pl'+Math.random().toString(36).slice(2)+Date.now();
+    if(!l.timeISO) l.timeISO = EPOCH_ISO;
+  });
+}
+normalizeDbShape();
+
+// ---------- 多裝置合併同步的共用邏輯 ----------
+// 品項／供應商：用id比對，兩邊都有的話留「異動時間比較新」的那筆；
+// 只有一邊有的話，要先看看是不是「另一邊其實早就刪除了、只是這台裝置比較舊還沒收到通知」，
+// 用墓碑清單（deletedXxxIds，記錄「什麼id在什麼時間被刪除」）判斷：
+// 如果刪除時間比對方那筆資料的異動時間還新，代表「先刪除、之後也沒有人在其他裝置改過它」，維持已刪除；
+// 如果對方那筆資料異動時間比刪除時間新，代表「刪除之後又有人在別的裝置改了它」，视为復活，保留下來。
+function mergeRecordsWithTombstones(localArr, remoteArr, localTombstones, remoteTombstones){
+  const remoteTomb = remoteTombstones||[], localTomb = localTombstones||[];
+  const combinedTomb = new Map();
+  localTomb.forEach(t=>{ if(t && t.id) combinedTomb.set(t.id, t.deletedAt||EPOCH_ISO); });
+  remoteTomb.forEach(t=>{
+    if(!t || !t.id) return;
+    const cur = combinedTomb.get(t.id);
+    if(!cur || (t.deletedAt||EPOCH_ISO) > cur) combinedTomb.set(t.id, t.deletedAt||EPOCH_ISO);
+  });
+  const localMap = new Map((localArr||[]).map(r=>[r.id, r]));
+  const remoteMap = new Map((remoteArr||[]).map(r=>[r.id, r]));
+  const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const merged = [];
+  allIds.forEach(id=>{
+    const lr = localMap.get(id), rr = remoteMap.get(id);
+    let winner;
+    if(lr && rr) winner = ((lr.updatedAt||EPOCH_ISO) >= (rr.updatedAt||EPOCH_ISO)) ? lr : rr;
+    else winner = lr || rr;
+    const deletedAt = combinedTomb.get(id);
+    if(deletedAt && winner && deletedAt > (winner.updatedAt||EPOCH_ISO)) return; // 刪除比任何一邊的異動都新，維持刪除
+    if(winner) merged.push(winner);
+  });
+  return { merged, tombstones: Array.from(combinedTomb, ([id,deletedAt])=>({id,deletedAt})) };
+}
+// 訂單／異動紀錄：只會新增或更新，不會被刪除，所以不用墓碑，單純用id比對取異動時間較新的那筆，
+// 並把只存在單一邊的記錄也留下來（避免漏掉另一台裝置新產生的訂單/紀錄）。
+function mergeAppendOnlyById(localArr, remoteArr, timeField){
+  const localMap = new Map((localArr||[]).map(r=>[r.id, r]));
+  const remoteMap = new Map((remoteArr||[]).map(r=>[r.id, r]));
+  const allIds = new Set([...localMap.keys(), ...remoteMap.keys()]);
+  const merged = [];
+  allIds.forEach(id=>{
+    const lr = localMap.get(id), rr = remoteMap.get(id);
+    if(lr && rr) merged.push(((lr[timeField]||EPOCH_ISO) >= (rr[timeField]||EPOCH_ISO)) ? lr : rr);
+    else merged.push(lr || rr);
+  });
+  return merged;
+}
+// 訂單／異動紀錄畫面都假設陣列是「新到舊」排序（例如只顯示最近10/30筆），
+// 合併/整包從雲端蓋回來之後都要重新排序一次，用純字串比較（ISO時間格式本身就是
+// 由大到小排就是由新到舊，不用localeCompare，避免不同瀏覽器/語系比較結果不一致）。
+function sortByTimeFieldDesc(arr, timeField){
+  arr.sort((a,b)=> (b[timeField]||EPOCH_ISO) > (a[timeField]||EPOCH_ISO) ? 1 : ((b[timeField]||EPOCH_ISO) < (a[timeField]||EPOCH_ISO) ? -1 : 0));
+}
+
+/* ---------- 系統設定（店名／Icon）---------- */
+/* ---------- 系統授權／試用／到期 ---------- */
+function daysBetween(a,b){ return Math.floor((b-a)/86400000); }
+function computeLicenseStatus(){
+  const lic = db.license;
+  const now = new Date();
+  const activation = new Date(lic.activationDate);
+  const trialEnd = new Date(activation.getTime() + lic.trialDays*86400000);
+  if(lic.status==='active' && lic.paidThroughDate){
+    const paidThrough = new Date(lic.paidThroughDate);
+    if(now > paidThrough){ lic.status='expired'; }
+  } else if(lic.status==='trial'){
+    if(now > trialEnd){ lic.status='expired'; }
+  }
+  return lic.status;
+}
+function daysUntilTrialEnd(){
+  const lic = db.license;
+  const activation = new Date(lic.activationDate);
+  const trialEnd = new Date(activation.getTime() + lic.trialDays*86400000);
+  return daysBetween(new Date(), trialEnd);
+}
+function daysUntilRenewal(){
+  if(!db.license.paidThroughDate) return null;
+  return daysBetween(new Date(), new Date(db.license.paidThroughDate));
+}
+function renderLicenseBanner(){
+  const beforeStatus = db.license.status;
+  const status = computeLicenseStatus();
+  // 只有「授權狀態真的改變了」（例如試用期到期變成expired）才需要存檔同步，
+  // 避免每次畫面渲染（幾乎每個操作都會觸發）都跟著整包推一次雲端，
+  // 減少不必要的同步、也降低跟其他裝置互相覆蓋資料的機會。
+  if(status !== beforeStatus) saveDB();
+  const bannerId = 'licenseBanner';
+  let el = document.getElementById(bannerId);
+  if(!el){
+    el = document.createElement('div');
+    el.id = bannerId;
+    document.body.insertBefore(el, document.getElementById('syncLine'));
+  }
+  el.innerHTML='';
+  if(status==='active'){
+    const d = daysUntilRenewal();
+    if(d!==null && d<=30 && isMaintainer()){
+      el.innerHTML = `<div style="background:#FBEFDC;color:var(--amber);text-align:center;
+        font-size:13px;font-weight:700;padding:8px 12px;">⏰ 續約日剩 ${d} 天，記得安排續約</div>`;
+    }
+  }
+}
+function renderLicenseGate(){
+  const status = computeLicenseStatus();
+  const gateId = 'licenseGate';
+  let gate = document.getElementById(gateId);
+  if(status==='expired' && !isMaintainer()){
+    if(!gate){
+      gate = document.createElement('div');
+      gate.id = gateId;
+      gate.style.cssText = 'position:fixed;inset:0;z-index:200;background:var(--charcoal);color:#fff;'+
+        'display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;';
+      gate.innerHTML = `<div style="font-size:40px;margin-bottom:16px;">🔒</div>
+        <div style="font-size:19px;font-weight:700;margin-bottom:10px;">系統使用期已到期</div>
+        <div style="font-size:15px;color:#D8CFC4;line-height:1.7;">請聯繫晨諾創意完成續約，即可繼續使用叫貨系統。<br>續約後由「維護專員」身份開通即可恢復。</div>`;
+      document.body.appendChild(gate);
+    }
+    gate.style.display='flex';
+  } else if(gate){
+    gate.style.display='none';
+  }
+}
+function activateOrRenewLicense(){
+  if(!isMaintainer()) return;
+  db.license.status='active';
+  const base = db.license.paidThroughDate && new Date(db.license.paidThroughDate) > new Date()
+    ? new Date(db.license.paidThroughDate) : new Date();
+  base.setFullYear(base.getFullYear()+1);
+  db.license.paidThroughDate = base.toISOString();
+  saveDB();
+  renderLicenseBanner(); renderLicenseGate(); renderAdmin();
+  showToast('已開通／續約一年');
+}
+function renderLicensePanel(){
+  const lic = db.license;
+  const status = computeLicenseStatus();
+  const statusLabel = {trial:'試用中', active:'已開通', expired:'已到期'}[status];
+  const wrap = document.getElementById('licensePanel');
+  if(!wrap) return;
+  if(!isMaintainer()){
+    wrap.innerHTML = `<div class="log-row"><b>目前狀態：</b>${statusLabel}</div>
+      <div class="log-row" style="color:var(--gray);">收費方案內容僅「維護專員」身份可查看</div>`;
+    return;
+  }
+  const actDateVal = new Date(lic.activationDate).toISOString().slice(0,10);
+  const paidThroughVal = lic.paidThroughDate ? new Date(lic.paidThroughDate).toISOString().slice(0,10) : '';
+  wrap.innerHTML = `
+    <div class="log-row"><b>目前狀態：</b>${statusLabel}</div>
+    <div class="field-row"><label>啟用日期</label><input type="date" id="licActDate" value="${actDateVal}"></div>
+    <div class="field-row"><label>試用天數</label><input type="number" id="licTrialDays" value="${lic.trialDays}"></div>
+    <div class="field-row"><label>設定費 NTD</label><input type="number" id="licSetupFee" value="${lic.setupFee}"></div>
+    <div class="field-row"><label>月費 NTD／月</label><input type="number" id="licMonthlyFee" value="${lic.monthlyFee}"></div>
+    <div class="field-row"><label>首年免收月數</label><input type="number" id="licFreeMonths" value="${lic.freeMonthsFirstYear}"></div>
+    <div class="field-row"><label>計費週期</label><input type="text" id="licBillingCycle" value="${escapeHtml(lic.billingCycle)}"></div>
+    <div class="field-row"><label>已繳費至（留空＝尚未開通）</label><input type="date" id="licPaidThrough" value="${paidThroughVal}"></div>
+    <button class="icon-btn" style="width:100%;" onclick="saveLicenseFields()">💾 儲存以上設定</button>
+    <button class="icon-btn" style="width:100%;margin-top:8px;" onclick="activateOrRenewLicense()">✓ 標記已收費並開通／續約一年（自動延長已繳費至日期）</button>
+  `;
+}
+function saveLicenseFields(){
+  if(!isMaintainer()) return;
+  const lic = db.license;
+  const actDate = document.getElementById('licActDate').value;
+  const paidThrough = document.getElementById('licPaidThrough').value;
+  lic.activationDate = actDate ? new Date(actDate+'T00:00:00').toISOString() : lic.activationDate;
+  lic.trialDays = parseInt(document.getElementById('licTrialDays').value)||lic.trialDays;
+  lic.setupFee = parseFloat(document.getElementById('licSetupFee').value)||0;
+  lic.monthlyFee = parseFloat(document.getElementById('licMonthlyFee').value)||0;
+  lic.freeMonthsFirstYear = parseInt(document.getElementById('licFreeMonths').value)||0;
+  lic.billingCycle = document.getElementById('licBillingCycle').value.trim() || lic.billingCycle;
+  lic.paidThroughDate = paidThrough ? new Date(paidThrough+'T00:00:00').toISOString() : null;
+  lic.status = lic.paidThroughDate ? 'active' : 'trial'; // 依有沒有已繳費至日期重新判定狀態，之後computeLicenseStatus還會依日期再自動校正
+  saveDB();
+  renderLicensePanel(); renderLicenseBanner(); renderLicenseGate();
+  showToast('已儲存授權設定');
+}
+
+function applySettings(){
+  document.getElementById('shopNameDisplay').textContent = '🔥 ' + db.settings.shopName;
+  document.getElementById('appSubDisplay').textContent = db.settings.appSub;
+  document.getElementById('pageTitleTag').textContent = db.settings.shopName + '｜' + db.settings.appSub;
+  if(db.settings.favicon){
+    document.getElementById('faviconLink').href = db.settings.favicon;
+  }
+  if(db.settings.bgPattern){
+    document.body.style.backgroundImage = `url('${db.settings.bgPattern}')`;
+    document.body.style.backgroundSize = '220px 220px';
+    document.body.style.backgroundRepeat = 'repeat';
+  } else {
+    document.body.style.backgroundImage = '';
+    document.body.style.backgroundSize = '';
+    document.body.style.backgroundRepeat = '';
+  }
+}
+const MAX_BG_UPLOAD_BYTES = 1.5*1024*1024;   // 背景圖案上限 1.5MB
+const MAX_FAVICON_UPLOAD_BYTES = 300*1024;    // 圖示上限 300KB（本來就只需要小圖示）
+// 2026-10-02新增：圖片不再直接轉base64塞進db.settings（那樣會讓單一儲存格的
+// 資料庫被撐爆，害所有資料同步一起失敗），改成先上傳到後端的Google雲端硬碟，
+// db.settings裡只存上傳完拿到的網址（短短一串文字，不會佔同步的空間）。
+function uploadImageToDrive_(file){
+  return new Promise((resolve, reject)=>{
+    const url = getGasUrl();
+    if(!url){ reject(new Error('尚未設定雲端網址，無法上傳圖片')); return; }
+    const reader = new FileReader();
+    reader.onload = async ()=>{
+      try{
+        const res = await fetch(url, {
+          method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify({ __uploadImage:true, imageDataUrl: reader.result, filename: file.name }),
+        });
+        const json = await res.json();
+        if(json && json.ok && json.url) resolve(json.url);
+        else reject(new Error((json && json.error) || '上傳失敗'));
+      }catch(e){ reject(e); }
+    };
+    reader.onerror = ()=>reject(new Error('圖片讀取失敗'));
+    reader.readAsDataURL(file);
+  });
+}
+async function onBgUpload(evt){
+  if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  if(file.size > MAX_BG_UPLOAD_BYTES){
+    showToast('圖片太大了（上限1.5MB），請用小一點的圖片，避免拖慢雲端同步');
+    evt.target.value = '';
+    return;
+  }
+  showToast('上傳中…');
+  try{
+    const url = await uploadImageToDrive_(file);
+    db.settings.bgPattern = url;
+    db.settings.updatedAt = nowISO();
+    const prev = document.getElementById('bgPreview');
+    prev.src = url; prev.style.display='inline-block';
+    saveDB(); applySettings();
+    showToast('背景圖案已套用');
+  }catch(e){
+    showToast('上傳失敗，請稍後再試一次');
+    evt.target.value = '';
+  }
+}
+function resetBg(){
+  if(!isMaintainer()){ showToast('只有「維護專員」能設定背景圖案'); return; }
+  db.settings.bgPattern = null;
+  db.settings.updatedAt = nowISO();
+  document.getElementById('bgPreview').style.display='none';
+  saveDB(); applySettings();
+  showToast('已還原預設背景');
+}
+function fillSettingsForm(){
+  document.getElementById('settingShopName').value = db.settings.shopName;
+  document.getElementById('settingAppSub').value = db.settings.appSub;
+  const prev = document.getElementById('faviconPreview');
+  if(db.settings.favicon){ prev.src = db.settings.favicon; prev.style.display='inline-block'; }
+}
+async function onFaviconUpload(evt){
+  if(!isStoreAdmin()) return;
+  const file = evt.target.files[0];
+  if(!file) return;
+  if(file.size > MAX_FAVICON_UPLOAD_BYTES){
+    showToast('圖示太大了（上限300KB），請用小一點的圖片');
+    evt.target.value = '';
+    return;
+  }
+  showToast('上傳中…');
+  try{
+    const url = await uploadImageToDrive_(file);
+    db.settings.favicon = url;
+    db.settings.updatedAt = nowISO();
+    const prev = document.getElementById('faviconPreview');
+    prev.src = url; prev.style.display='inline-block';
+    saveDB(); applySettings();
+    showToast('圖示已套用');
+  }catch(e){
+    showToast('上傳失敗，請稍後再試一次');
+    evt.target.value = '';
+  }
+}
+function saveSettings(){
+  if(!isStoreAdmin()){ showToast('只有「管理者」以上身份能修改設定'); return; }
+  db.settings.shopName = document.getElementById('settingShopName').value.trim() || db.settings.shopName;
+  db.settings.appSub = document.getElementById('settingAppSub').value.trim() || db.settings.appSub;
+  db.settings.updatedAt = nowISO();
+  saveDB();
+  applySettings();
+  showToast('系統設定已儲存');
+}
+
+/* ---------- 帳號登入 ---------- */
+const SESSION_KEY = 'kklz_session';
+const SESSION_DAYS = 7;
+let currentAccount = null;
+
+function checkSession(){
+  try{
+    const raw = localStorage.getItem(SESSION_KEY);
+    if(!raw) return null;
+    const sess = JSON.parse(raw);
+    if(new Date(sess.expiresAt) < new Date()) return null;
+    const acc = db.accounts.find(a=>a.id===sess.accountId);
+    return acc || null;
+  }catch(e){ return null; }
+}
+function initLogin(){
+  const acc = checkSession();
+  if(acc){
+    loginAsAccount(acc, false);
+  } else {
+    document.getElementById('loginGate').classList.add('show');
+  }
+}
+// 2026-10-02新增：密碼改用SHA-256雜湊存放，不再是明文。looksHashed_用來判斷
+// 一個密碼欄位現在存的是不是雜湊值（64個16進位字元）——舊帳號在這次更新之前
+// 都是明文，不會符合這個格式，第一次成功登入時會順便把它升級成雜湊存回去，
+// 不需要手動幫每個帳號重設密碼。
+function looksHashed_(pw){ return typeof pw === 'string' && /^[0-9a-f]{64}$/.test(pw); }
+async function hashPassword_(plain){
+  const data = new TextEncoder().encode(plain);
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function doLogin(){
+  const account = document.getElementById('loginAccount').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
+  // 帳號不分大小寫（手機輸入常常會被自動大寫第一個字），密碼維持區分大小寫
+  const tryMatch = async () => {
+    const acc = db.accounts.find(a=>a.account.toLowerCase()===account.toLowerCase());
+    if(!acc) return null;
+    if(looksHashed_(acc.password)){
+      return (await hashPassword_(password)) === acc.password ? acc : null;
+    }
+    // 舊帳號還是明文：比對成功的話，順便就地升級成雜湊存起來（並同步到雲端），
+    // 之後這個帳號就不再是明文了，不用額外請Barbara手動重設。
+    if(acc.password === password){
+      acc.password = await hashPassword_(password);
+      saveDB();
+      return acc;
+    }
+    return null;
+  };
+  let acc = await tryMatch();
+  if(!acc && getGasUrl()){
+    // 帳密對不上時，先別急著判定錯誤：有可能是這台裝置剛好在帳號被新增／
+    // 修改「之前」就已經打開頁面，本機記憶體裡還是舊的帳號清單、雲端已經
+    // 是最新的了。這裡偷偷重新拉一次雲端最新資料再比對一次，避免使用者
+    // 被「資料還沒同步」誤導成「帳號密碼打錯」。
+    const btn = document.querySelector('#loginGate .confirm-btn');
+    if(btn){ btn.disabled = true; btn.textContent = '確認中…'; }
+    // 網路狀況不好時fetch可能一直吊著不回應，最多等8秒就放棄重試，
+    // 不要讓使用者被卡在「確認中…」按鈕動不了。
+    await Promise.race([ pullFromCloud(false), new Promise(r=>setTimeout(r, 8000)) ]);
+    if(btn){ btn.disabled = false; btn.textContent = '登入'; }
+    acc = await tryMatch();
+  }
+  if(!acc){
+    document.getElementById('loginError').style.display='block';
+    return;
+  }
+  document.getElementById('loginError').style.display='none';
+  loginAsAccount(acc, true);
+}
+function loginAsAccount(acc, persistSession){
+  currentAccount = acc; // 身份只存在這支裝置的記憶體/session裡，故意不寫回db，避免跟其他裝置互相覆蓋
+  if(persistSession){
+    const expiresAt = new Date(Date.now() + SESSION_DAYS*86400000).toISOString();
+    localStorage.setItem(SESSION_KEY, JSON.stringify({accountId:acc.id, expiresAt}));
+  }
+  document.getElementById('loginGate').classList.remove('show');
+  document.getElementById('loggedInLabel').textContent = `👤 ${acc.name}（${acc.role}）`;
+  applyRole();
+  renderAll();
+  renderLicenseGate();
+  renderLicenseBanner();
+  renderPendingShareBar_();
+}
+function doLogout(){
+  localStorage.removeItem(SESSION_KEY);
+  currentAccount = null;
+  document.getElementById('loginAccount').value='';
+  document.getElementById('loginPassword').value='';
+  document.getElementById('loginGate').classList.add('show');
+}
+function applyRole(){
+  document.body.classList.toggle('readonly', isReadonly());
+}
+/* 注意：身份一律只認「這支裝置自己登入的帳號」(currentAccount)，
+   不可以看會同步雲端、大家共用的db.currentRole——否則管理者跟叫貨者兩支手機同時在線，
+   身份判斷會互相蓋過去，是很危險的bug，所以這裡刻意不用db.currentRole。 */
+function isReadonly(){ return !!currentAccount && currentAccount.role === '營運(唯讀)'; }
+
+/* ---------- Tab / 頁面切換 ---------- */
+function switchTab(tab){
+  state.activeTab = tab;
+  document.querySelectorAll('.tabbar .tab').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  const map = {order:'page-order', receive:'page-receive', stock:'page-stock', admin:'page-admin'};
+  goPage(map[tab]);
+  if(tab==='receive') renderReceive();
+  if(tab==='stock') renderStock();
+  if(tab==='admin') renderAdmin();
+  updateCheckoutBar();
+}
+function goPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  updateCheckoutBar();
+}
+
+function renderSupplierListSafe_(){
+  const ae = document.activeElement;
+  if(ae && ae.id==='newSupplierName') return; // 正在打新供應商名稱時不重畫（清單本身沒有輸入框，其餘情況照常更新）
+  renderSupplierList();
+}
+/* ---------- 供應商清單（下單頁）---------- */
+function renderSupplierList(){
+  const wrap = document.getElementById('supplierList');
+  document.getElementById('supplierCount').textContent = `共 ${db.suppliers.length} 家`;
+  const addRow = document.getElementById('addSupplierRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
+  const sorted = [...db.suppliers].sort((a,b)=> (b.freq||0)-(a.freq||0));
+  if(sorted.length===0){ wrap.innerHTML = '<div class="empty">尚未新增任何供應商</div>'; return; }
+  wrap.innerHTML = sorted.map((s,idx)=>{
+    const inCart = db.cart[s.id] ? Object.keys(db.cart[s.id]).length : 0;
+    const star = idx<3 ? '<span class="star">常用</span>' : '';
+    return `<div class="supplier-card" onclick="openSupplier('${s.id}')">
+      <div class="left"><span class="sup-mono" aria-hidden="true">${escapeHtml(String(s.name||'').trim().charAt(0))}</span><span class="name">${escapeHtml(s.name)}</span>${star}</div>
+      <div class="left">${inCart? `<span class="badge-in">已選 ${inCart} 項</span>`:''}<span class="chev">›</span></div>
+    </div>`;
+  }).join('');
+}
+function openSupplier(id){
+  state.currentSupplierId = id;
+  const s = db.suppliers.find(x=>x.id===id);
+  s.freq = (s.freq||0)+0; // 進入不加頻率，實際下單送出才加
+  document.getElementById('itemsSupplierTitle').innerHTML = escapeHtml(s.name)+' <span class="cnt">依供應商分組顯示</span>';
+  goPage('page-items');
+  renderItemList();
+}
+function addSupplier(){
+  if(!isStoreAdmin()) return;
+  const input = document.getElementById('newSupplierName');
+  const name = input.value.trim();
+  if(!name) return;
+  if(db.suppliers.some(s=>s.name===name)){ showToast('已經有一家同名的供應商了'); return; }
+  db.suppliers.push({id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0, updatedAt:nowISO()});
+  input.value='';
+  logAction('新增供應商', name, '');
+  saveDB(); renderSupplierList(); renderAdmin();
+  showToast('已新增供應商');
+}
+
+/* ---------- 品項清單 ---------- */
+function renderItemList(){
+  const sid = state.currentSupplierId;
+  const wrap = document.getElementById('itemList');
+  const addRow = document.getElementById('addItemRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
+  const items = sortedItemsForSupplier(sid);
+  const cart = db.cart[sid] || {};
+  if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項，先在下方新增</div>'; return; }
+  wrap.className = state.itemViewMode==='grid' ? 'item-grid-wrap' : '';
+  if(state.itemViewMode==='grid'){
+    wrap.innerHTML = items.map(it=>{
+      const qty = cart[it.id]||0;
+      const checked = qty>0;
+      return `<div class="item-grid-cell ${checked?'checked':''}" id="cell-${it.id}">
+        <div class="grid-icon">${pickItemIcon(it.name)}</div>
+        <div class="grid-name">${escapeHtml(it.name)}</div>
+        <div class="grid-price">NTD ${it.price}／${escapeHtml(it.unit)}</div>
+        <div class="grid-controls">
+          <input type="number" step="any" min="0" class="qty-input" value="${qty||''}" placeholder="0"
+            onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
+        </div>
+        ${isStoreAdmin()?`<div class="del-x" style="font-size:12px;margin-top:6px;" onclick="deleteItem('${it.id}')">刪除品項</div>`:''}
+      </div>`;
+    }).join('');
+    return;
+  }
+  wrap.innerHTML = items.map(it=>{
+    const qty = cart[it.id]||0;
+    const checked = qty>0;
+    return `<div class="item-row ${checked?'checked':''}" id="row-${it.id}">
+      <div class="item-info">
+        <div class="item-code">${escapeHtml(it.code||'')}</div>
+        <div class="item-name">${escapeHtml(it.name)}</div>
+        <div class="item-price-row">單價 NTD <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'}
+          onchange="updateItemPrice('${it.id}', this.value)"> / <input type="text" value="${escapeHtml(it.unit)}" ${isStoreAdmin()?'':'disabled'}
+          style="width:70px;text-align:left;" onchange="updateItemUnit('${it.id}', this.value)">
+          ${isStoreAdmin()?`<span class="del-x" style="padding:2px 8px;font-size:12px;" onclick="deleteItem('${it.id}')">刪除</span>`:''}
+        </div>
+      </div>
+      <div class="item-controls">
+        <span class="qty-stepper">
+          <button type="button" class="st-minus" aria-label="減少數量" onclick="stepQty_('${sid}','${it.id}',-1)" ${isReadonly()?'disabled':''}>−</button>
+          <input type="number" step="any" min="0" inputmode="decimal" class="qty-input" value="${qty||''}" placeholder="0"
+            onchange="setQtyDirect('${sid}','${it.id}', this.value)" ${isReadonly()?'disabled':''}>
+          <button type="button" class="st-plus" aria-label="增加數量" onclick="stepQty_('${sid}','${it.id}',1)" ${isReadonly()?'disabled':''}>+</button>
+        </span>
+        <span style="font-size:12px;color:var(--gray);">${escapeHtml(it.unit)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+// 2026-10-28：數量旁的「－ ＋」按鈕（Barbara 指定）：一次加減1，最少到0；一樣可以直接打字（例如 0.5 斤）
+function stepQty_(sid, itemId, d){
+  if(isReadonly()) return;
+  const cur = (db.cart[sid] && db.cart[sid][itemId]) || 0;
+  const next = Math.max(0, Math.round((cur + d) * 100) / 100);
+  setQtyDirect(sid, itemId, next);
+  const inp = document.querySelector('#row-'+itemId+' .qty-input');
+  if(inp) inp.value = next || '';
+}
+function setQtyDirect(sid, itemId, val){
+  if(isReadonly()) return;
+  const qty = parseFloat(val);
+  if(!db.cart[sid]) db.cart[sid]={};
+  if(!qty || qty<=0){ delete db.cart[sid][itemId]; }
+  else { db.cart[sid][itemId] = qty; }
+  if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
+  touchCartSupplier_(sid);
+  saveDB();
+  // 2026-10-20：只更新這一格的勾選外觀，不重畫整個清單（重畫會洗掉店員正在打的下一格）
+  const cell = document.getElementById('row-'+itemId) || document.getElementById('cell-'+itemId);
+  if(cell) cell.classList.toggle('checked', !!(db.cart[sid] && db.cart[sid][itemId]>0));
+  else if(!isUserTyping_()) renderItemList();
+  updateCheckoutBar(); renderSupplierListSafe_();
+}
+function updateItemPrice(itemId, val){
+  if(!isStoreAdmin()) return;
+  const raw = parseFloat(val); if(isNaN(raw)) return;
+  const p = money(raw);
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item || item.price===p) return;
+  const old = item.price;
+  item.price = p;
+  item.updatedAt = nowISO();
+  db.priceLog.unshift({id:'pl'+Math.random().toString(36).slice(2)+Date.now(), itemId:item.id, itemName:item.name, old, next:p, role: currentAccount?currentAccount.role:'',
+    time:new Date().toLocaleString('zh-TW',{hour12:false}), timeISO:nowISO()});
+  saveDB(); renderStock(); renderAdmin();
+  showToast('單價已更新並記錄');
+}
+function updateItemUnit(itemId, val){
+  if(!isStoreAdmin()) return;
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const v = val.trim();
+  if(!v || item.unit===v) return;
+  item.unit = v;
+  item.updatedAt = nowISO();
+  saveDB(); renderItemList(); renderStock(); renderItemManage();
+  showToast('單位已更新');
+}
+// 品項的顯示順序不再依賴db.items陣列本身的排列順序（多裝置合併同步時，陣列順序
+// 沒辦法保證跟妳手動排的一樣），改成每個品項自己帶一個sortIndex數字欄位，
+// 顯示的時候依sortIndex排序。這樣就算合併同步把陣列重新組合過，排序也不會亂，
+// 而且sortIndex本身也有updatedAt保護，兩台裝置搶著調順序的話一樣是留比較新的那次。
+function sortedItemsForSupplier(sid){
+  // sortIndex相同時（極端情況：兩台裝置離線各自新增品項，合併時剛好算出同一個值），
+  // 用id當第二個排序依據，確保「不管在哪一台裝置上看，順序都一樣」，不會兩邊看到的順序不同。
+  return db.items.filter(i=>i.supplierId===sid).sort((a,b)=>(a.sortIndex||0)-(b.sortIndex||0) || String(a.id).localeCompare(String(b.id)));
+}
+function nextSortIndex(sid){
+  const existing = db.items.filter(i=>i.supplierId===sid).map(i=>i.sortIndex||0);
+  return existing.length ? Math.max(...existing)+1 : 1;
+}
+function moveItem(itemId, dir){
+  if(!isStoreAdmin()) return;
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item) return;
+  let sameSupplier = sortedItemsForSupplier(item.supplierId);
+  const idx = sameSupplier.findIndex(i=>i.id===itemId);
+  const swapIdx = idx + dir;
+  if(swapIdx<0 || swapIdx>=sameSupplier.length) return;
+  let other = sameSupplier[swapIdx];
+  if(item.sortIndex===other.sortIndex){
+    // 兩筆品項的sortIndex剛好一樣（例如兩台裝置離線時各自替同一家供應商新增品項，
+    // 合併同步時湊巧算出同一個排序值），直接交換等於沒交換，上下鍵會像按了沒反應。
+    // 這裡先把這家供應商底下的品項依目前排序重新編號成1,2,3...打破並列，再繼續交換。
+    sameSupplier.forEach((it,i)=>{ it.sortIndex = i+1; });
+    other = sameSupplier[swapIdx];
+  }
+  const tmp = item.sortIndex;
+  item.sortIndex = other.sortIndex;
+  other.sortIndex = tmp;
+  item.updatedAt = nowISO();
+  other.updatedAt = nowISO();
+  saveDB(); renderItemList(); renderItemManage();
+}
+function addItem(){
+  if(!isStoreAdmin()) return;
+  const name = document.getElementById('newItemName').value.trim();
+  const price = money(parseFloat(document.getElementById('newItemPrice').value)||0);
+  if(!name) return;
+  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:state.currentSupplierId, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(state.currentSupplierId)});
+  document.getElementById('newItemName').value='';
+  document.getElementById('newItemPrice').value='';
+  {
+    const s = db.suppliers.find(x=>x.id===state.currentSupplierId);
+    logAction('新增品項', s?s.name:'', `${name} / $${price}`);
+  }
+  saveDB(); renderItemList();
+  showToast('已新增品項');
+}
+function addItemFromManage(){
+  if(!isStoreAdmin()) return;
+  const sid = document.getElementById('itemManageSupplierSelect').value;
+  if(!sid){ showToast('請先選擇供應商'); return; }
+  const name = document.getElementById('itemManageNewName').value.trim();
+  const price = money(parseFloat(document.getElementById('itemManageNewPrice').value)||0);
+  if(!name) return;
+  db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:sid, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(sid)});
+  document.getElementById('itemManageNewName').value='';
+  document.getElementById('itemManageNewPrice').value='';
+  {
+    const s = db.suppliers.find(x=>x.id===sid);
+    logAction('新增品項', s?s.name:'', `${name} / $${price}`);
+  }
+  saveDB(); renderItemManage(); renderItemList();
+  showToast('已新增品項');
+}
+function deleteItem(itemId){
+  if(!isStoreAdmin()) return;
+  const deletedItem = db.items.find(i=>i.id===itemId);
+  if(!deletedItem) return;
+  // 2026-10-02新增：品項刪除原本是「點了就刪、沒有二次確認」，跟訂單刪除（已有
+  // 二次確認）的安全等級不一致，手機上列表密集很容易手滑點到。補上跟刪除訂單
+  // 同樣規格的確認視窗，說清楚刪了什麼、後果是什麼。
+  const okDel = window.confirm(`確定要刪除這個品項嗎？此動作無法復原。\n\n品項：${deletedItem.name}\n單價：NTD ${deletedItem.price} / ${deletedItem.unit}`);
+  if(!okDel) return;
+  db.items = db.items.filter(i=>i.id!==itemId);
+  db.deletedItemIds.push({id:itemId, deletedAt:nowISO()}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
+  for(const sid in db.cart){
+    if(!(itemId in db.cart[sid])) continue;
+    delete db.cart[sid][itemId];
+    if(Object.keys(db.cart[sid]).length===0) delete db.cart[sid];
+    touchCartSupplier_(sid);
+  }
+  if(deletedItem){
+    const s = db.suppliers.find(x=>x.id===deletedItem.supplierId);
+    logAction('刪除品項', s?s.name:'', deletedItem.name);
+  }
+  saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList(); renderAdmin();
+  showToast('已刪除品項');
+}
+function quickReorder(){
+  if(isReadonly()) return;
+  const sid = state.currentSupplierId;
+  const last = db.lastOrderBySupplier[sid];
+  if(!last){ showToast('這家供應商還沒有歷史訂單可複製'); return; }
+  const filtered = {};
+  let droppedCount = 0;
+  Object.keys(last).forEach(itemId=>{
+    if(db.items.some(i=>i.id===itemId && i.supplierId===sid)) filtered[itemId] = last[itemId];
+    else droppedCount++;
+  });
+  if(Object.keys(filtered).length===0){ showToast('上次訂購的品項都已經被刪除了，請重新挑選品項'); return; }
+  db.cart[sid] = filtered;
+  touchCartSupplier_(sid);
+  saveDB(); renderItemList(); updateCheckoutBar(); renderSupplierList();
+  showToast(droppedCount>0 ? `已複製上次訂單內容（${droppedCount}項已刪除的品項自動略過）` : '已複製上次訂單內容，可微調數量');
+}
+
+/* ---------- 方格檢視切換 ---------- */
+function toggleItemView(){
+  state.itemViewMode = state.itemViewMode==='grid' ? 'list' : 'grid';
+  document.getElementById('viewToggleBtn').textContent =
+    state.itemViewMode==='grid' ? '📋 切換回清單檢視' : '🔲 切換成方格檢視';
+  renderItemList();
+}
+function pickItemIcon(name){
+  const map = [
+    [/雞|鴨|禽/, '🍗'], [/豬|肉/, '🥩'], [/牛/, '🐄'], [/魚|蝦|蟹|海鮮|貝/, '🦐'],
+    [/菜|豆芽|蔥|蒜|薑|蘿蔔|洋蔥|高麗/, '🥬'], [/菇/, '🍄'], [/蛋/, '🥚'],
+    [/酒|酒精/, '🍶'], [/鹽|糖|粉|調味|醬/, '🧂'], [/袋|手套|布|耗材/, '🧤'],
+    [/水果|蘋果|梨|桃/, '🍎'], [/泡菜/, '🥢'],
+  ];
+  for(const [re, icon] of map){ if(re.test(name)) return icon; }
+  return '📦';
+}
+
+/* ---------- 底部結帳列 ---------- */
+function cartSuppliersCount(){ return Object.keys(db.cart).length; }
+function cartGrandTotal(){
+  let total=0;
+  for(const sid in db.cart){
+    for(const itemId in db.cart[sid]){
+      const item = db.items.find(i=>i.id===itemId);
+      if(item) total += item.price * db.cart[sid][itemId];
+    }
+  }
+  return money(total);
+}
+function updateCheckoutBar(){
+  const bar = document.getElementById('checkoutBar');
+  const n = cartSuppliersCount();
+  const onOrderPages = ['page-order','page-items'].includes(document.querySelector('.page.active')?.id);
+  if(n>0 && onOrderPages && !isReadonly()){
+    bar.classList.add('show');
+    document.getElementById('checkoutInfoLine').textContent = `已選 ${n} 家供應商`;
+    document.getElementById('cartTotal').textContent = cartGrandTotal();
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+/* ---------- 結帳頁 ---------- */
+// 2026-10-18：送出頁每家供應商可勾選，預設全勾；沒勾的留在購物車，不送出。
+function resetCheckoutPicks_(){
+  state.checkoutSkip = {};
+  const waiting = !!window.__pendingCheckoutOrders;
+  const mb = document.getElementById('checkoutConfirmBtn'); if(mb) mb.style.display = waiting ? 'none' : '';
+  const rb = document.getElementById('checkoutRetryBtn'); if(rb) rb.style.display = waiting ? '' : 'none';
+}
+function checkoutSelectedSids_(){
+  const skip = state.checkoutSkip||{};
+  return Object.keys(db.cart).filter(sid=> !skip[sid] && db.suppliers.some(s=>s.id===sid));
+}
+function toggleCheckoutPick_(sid, checked){
+  if(!state.checkoutSkip) state.checkoutSkip = {};
+  if(checked) delete state.checkoutSkip[sid]; else state.checkoutSkip[sid] = true;
+  renderCheckout();
+}
+function checkoutSelectedTotal_(){
+  let total = 0;
+  checkoutSelectedSids_().forEach(sid=>{
+    for(const itemId in db.cart[sid]){
+      const item = db.items.find(i=>i.id===itemId);
+      if(item) total += item.price * db.cart[sid][itemId];
+    }
+  });
+  return money(total);
+}
+function renderCheckout(){
+  const wrap = document.getElementById('checkoutBody');
+  const skip = state.checkoutSkip||{};
+  let html='';
+  let blockCount = 0;
+  for(const sid in db.cart){
+    const s = db.suppliers.find(x=>x.id===sid);
+    if(!s) continue; // 供應商已被刪除，購物車殘留資料略過
+    let sub=0;
+    let rows='';
+    for(const itemId in db.cart[sid]){
+      const item = db.items.find(i=>i.id===itemId);
+      if(!item) continue; // 品項已被刪除，避免結帳頁面因為找不到資料而出錯
+      const qty = db.cart[sid][itemId];
+      const lineTotal = item.price*qty;
+      sub += lineTotal;
+      rows += `<div class="co-item"><span>${escapeHtml(item.name)}　x${qty}　（${escapeHtml(item.unit)}）</span><span>NTD ${money(lineTotal)}</span></div>`;
+    }
+    if(!rows) continue;
+    blockCount++;
+    const picked = !skip[sid];
+    html += `<div class="supplier-block ${picked?'':'skipped'}" data-sid="${sid}">
+      <label class="co-pick-row"><input type="checkbox" class="co-pick" data-sid="${sid}" ${picked?'checked':''}
+        onchange="toggleCheckoutPick_('${sid}', this.checked)"><h3>${escapeHtml(s.name)}</h3></label>${rows}
+      <div class="co-sub"><span>小計</span><span>NTD ${money(sub)}</span></div></div>`;
+  }
+  if(html){
+    const n = checkoutSelectedSids_().length;
+    html = `<div class="co-pick-hint">已勾選 ${n} / ${blockCount} 家。只會送出有勾的；沒勾的會留在購物車，之後再送。</div>` + html;
+  }
+  wrap.innerHTML = html || '<div class="empty">購物車是空的</div>';
+  document.getElementById('grandTotal').textContent = checkoutSelectedTotal_();
+  if(!document.getElementById('deliveryDate').value){
+    const d = new Date(); d.setDate(d.getDate()+1);
+    document.getElementById('deliveryDate').value = d.toISOString().slice(0,10);
+  }
+}
+
+// 2026-10-01改版原因：原本下單是「本機先產生單號、馬上顯示可以分享LINE，雲端同步
+// 另外在背景默默做」——結果就是品饌那張單的事故：單號跟LINE分享訊息都出來了，
+// 但雲端其實根本沒收到，員工/客人完全看不出來。
+// 改成：單號產生、購物車清空（這兩步是本機動作，一定成功）之後，不會馬上開分享視窗，
+// 而是先實際送一次雲端、「等雲端真的確認收到」才顯示完成畫面、才能分享LINE。
+// 送出失敗的話，訂單還是安全存在本機（不會不見），畫面改顯示「重新送出」讓使用者自己重試。
+async function confirmCheckout(){
+  if(cartSuppliersCount()===0) return;
+  const selectedSids = checkoutSelectedSids_();
+  if(selectedSids.length===0){ showToast('請至少勾選一家供應商'); return; }
+  const date = document.getElementById('deliveryDate').value;
+  const note = document.getElementById('orderNote').value.trim();
+  const newOrders = [];
+  for(const sid of selectedSids){
+    const s = db.suppliers.find(x=>x.id===sid);
+    if(!s) continue; // 供應商已被刪除，這筆購物車殘留資料略過
+    const items = Object.keys(db.cart[sid]).map(itemId=>{
+      const item = db.items.find(i=>i.id===itemId);
+      if(!item) return null; // 品項已被刪除（例如快速再訂複製到舊品項），略過避免結帳失敗
+      return {itemId:item.id, code:item.code, name:item.name, unit:item.unit, price:item.price, qty:db.cart[sid][itemId]};
+    }).filter(Boolean);
+    if(items.length===0) continue; // 這家供應商購物車裡的品項全部都已經被刪除了，不產生空訂單
+    const createdAtISO = nowISO();
+    const order = {
+      id:'PO'+Date.now()+Math.floor(Math.random()*100),
+      supplierId:sid, supplierName:s.name, items, deliveryDate:date, note,
+      status:'sent', createdAt:new Date().toLocaleString('zh-TW',{hour12:false}),
+      createdAtISO, updatedAt:createdAtISO,
+      received:null,
+      // 2026-10-01新增：記下單人帳號，讓「下單記錄」「收貨對帳」這些後台報表
+      // 也能直接看到「誰下的單」，不用另外去翻操作紀錄分頁對照。
+      createdByAccount: currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入',
+    };
+    db.orders.unshift(order);
+    db.lastOrderBySupplier[sid] = {...db.cart[sid]};
+    s.freq = (s.freq||0)+1;
+    s.updatedAt = nowISO();
+    newOrders.push(order);
+    logAction('下單', s.name, `${order.id} / ${items.map(it=>it.name+' x'+it.qty).join('、')}`);
+  }
+  if(newOrders.length===0) return; // 購物車裡的品項/供應商全部被刪除過，沒有任何有效訂單可以送出
+  // 2026-10-18：只清掉「這次有勾、已送出」的供應商購物車；沒勾的留著。
+  // 供應商已被刪除的殘留購物車也順便清掉（跟以前整包清空的效果一致）。
+  Object.keys(db.cart).forEach(sid=>{
+    if(selectedSids.includes(sid) || !db.suppliers.some(s=>s.id===sid)){
+      delete db.cart[sid];
+      touchCartSupplier_(sid);
+    }
+  });
+  resetCheckoutPicks_();
+  document.getElementById('orderNote').value='';
+  renderSupplierList();
+  updateCheckoutBar();
+
+  window.__pendingCheckoutOrders = newOrders; // 記著這批訂單，萬一送不出去，「重新送出」按鈕要用同一批、不是重新結帳
+  await attemptCheckoutPush_();
+}
+function showCheckoutSubmittingState_(show){
+  const spinner = document.getElementById('checkoutSubmitting');
+  // 2026-10-20修正：原本抓的是畫面上「第一個」confirm-btn，其實是登入頁的按鈕，結帳鈕從來沒被藏起來
+  const btn = document.getElementById('checkoutConfirmBtn');
+  if(spinner) spinner.style.display = show ? '' : 'none';
+  if(btn) btn.style.display = show ? 'none' : '';
+}
+async function attemptCheckoutPush_(){
+  const newOrders = window.__pendingCheckoutOrders;
+  if(!newOrders) return;
+  const retryBtn = document.getElementById('checkoutRetryBtn');
+  if(retryBtn) retryBtn.style.display = 'none';
+
+  if(!getGasUrl()){
+    // 沒設定雲端網址＝刻意單機模式，沒有雲端可以等確認，維持原本「存本機就算完成」的行為
+    saveDB();
+    window.__pendingCheckoutOrders = null;
+    openShareModal(newOrders);
+    return;
+  }
+
+  addPendingShare_(newOrders.map(o=>o.id));
+  showCheckoutSubmittingState_(true);
+  saveDBLocalOnly(); // 先確定寫進本機，不管接下來雲端送不送得出去，這筆都不會不見
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
+  localChangeVersion++; // 這幾張新訂單算一次「本機變了」，版本號跟著走
+
+  // 不要跟背景那套debounce排程搶著打雲端，先清掉排程、等正在跑的背景push（如果有）結束，
+  // 自己來做這一次「送出並確認」。
+  clearTimeout(cloudSyncTimer); cloudSyncTimer = null;
+  let waited = 0;
+  while(cloudPushInFlight && waited < 10000){ await new Promise(r=>setTimeout(r, 200)); waited += 200; }
+  // 全面體檢時多補的一處：剛剛等待期間，那個「更早的背景push」如果成功了，它自己
+  // 的doPushToCloud()成功回呼會把PENDING_SYNC_KEY清掉（它認為「目前沒有異動還沒送出」，
+  // 但其實這張訂單是在它送出「之後」才加進來的，還沒被它送到）。這裡重新補標記一次，
+  // 確保接下來這次「真正要送這張訂單」的push開始之前，旗標一定正確反映「還有東西
+  // 沒確認送達」，不會因為上一個不相關的背景push剛好同時結束而被誤清掉。
+  try{ localStorage.setItem(PENDING_SYNC_KEY, '1'); }catch(e){}
+  cloudPushInFlight = true;
+  setSyncStatus('syncing');
+  const ok = await pushOnce_();
+  cloudPushInFlight = false;
+  if(cloudPushPending){ cloudPushPending = false; pushToCloud(); }
+
+  showCheckoutSubmittingState_(false);
+
+  // 多一層保險：不能只信任後端回的ok旗標，也不能看push完之後的db.orders——
+  // 因為db現在是跟伺服器回應「合併」、不是整包蓋掉（2026-10-01修正過的race
+  // condition，見pushOnce_內部），本機早就知道自己剛加的訂單，合併完db.orders
+  // 一定找得到它，這樣驗證不出「伺服器那邊是不是真的也收到、存進去了」。
+  // 真正要驗證的是lastPushRemoteData——這是伺服器這次回應裡原始的合併結果，
+  // 如果伺服器真的收到並存檔成功，這裡面一定會有剛剛送出的這幾張訂單；
+  // 如果走到舊版相容路徑（legacyGetMergePost_，伺服器沒有回data欄位），就沒有
+  // 這份原始回應可以驗證，退回用db.orders判斷（此時db.orders已經是確定送出
+  // 之後、跟雲端合併過的結果，仍然是合理的次佳驗證）。
+  let reallyConfirmed = ok && (
+    lastPushRemoteData
+      ? newOrders.every(o => lastPushRemoteData.orders.some(x => x.id === o.id))
+      : newOrders.every(o => db.orders.some(x => x.id === o.id))
+  );
+  if(!reallyConfirmed){
+    // 2026-10-20：手機沒收到「成功」回覆，不代表後台沒收到。直接去後台查這幾張單號，
+    // 查得到就是成功——以「後台實際有沒有這張單」為準，不再讓店員卡在重送。
+    showCheckoutSubmittingState_(true);
+    reallyConfirmed = await verifyOrdersInCloud_(newOrders.map(o=>o.id));
+    showCheckoutSubmittingState_(false);
+  }
+
+  if(reallyConfirmed){
+    setSyncStatus('synced');
+    // 跟doPushToCloud()同一套版本號判斷：訂單本身確定送達了（上面reallyConfirmed已經
+    // 驗證過），但如果送出去、等回應這段期間（2-6秒）使用者又手動改了別的地方
+    // （例如同時間管理員在改品項），版本號會不一樣，代表還有「這張訂單以外」的
+    // 異動沒送到，旗標不能清、要再補送一次，不能因為訂單本身成功就以為全部都到齊了。
+    if(localChangeVersion === versionAtLastPushStart){
+      try{ localStorage.removeItem(PENDING_SYNC_KEY); }catch(e){}
+      updatePendingSyncBanner_(); // 理由同doPushToCloud()那處：setSyncStatus()已經先跑過，要再刷新一次banner
+      showSyncSuccessBanner_(newOrders.length>1 ? `${newOrders.length}張訂單已確認送達雲端，後台同步完成` : '訂單已確認送達雲端，後台同步完成'); // 這是Barbara最在意的「客戶輸入的每一筆」最關鍵的一刻，一定要主動、明確告知
+    } else {
+      queueCloudSync();
+    }
+    window.__pendingCheckoutOrders = null;
+    checkoutAutoRetryCount_ = 0; clearTimeout(checkoutAutoRetryTimer_);
+    if(currentAccount) renderAll(); // 雲端合併回來的最終結果套用到畫面
+    // 2026-10-20：店員還在結帳頁等結果 → 直接打開清單；已經去做別的事了（自動重送晚一點才成功）
+    // → 不跳視窗打斷，改用綠色提示列讓店員自己點開
+    if(document.getElementById('page-checkout').classList.contains('active')){
+      openShareModal(newOrders);
+    } else {
+      newOrders.forEach(o=>{ if(confirmedUnsharedIds_.indexOf(o.id)<0) confirmedUnsharedIds_.push(o.id); });
+      renderPendingShareBar_();
+      showSyncSuccessBanner_('訂單已確認送達，請點下方綠色提示把清單傳給廠商');
+    }
+  } else {
+    setSyncStatus('error');
+    if(retryBtn) retryBtn.style.display = '';
+    { const mb = document.getElementById('checkoutConfirmBtn'); if(mb) mb.style.display = 'none'; }
+    showToast(authNeedsReentry_
+      ? '訂單已安全存在手機。請點上方「輸入代碼」，輸入後會自動送出並產生LINE清單'
+      : '訂單已安全存在手機，系統會自動重送；送達後會自動出現LINE清單');
+    // 自動重送（10秒、20秒、40秒…最長60秒一次），不用店員一直按；代碼有問題時等店員輸入後再送
+    checkoutAutoRetryCount_++;
+    clearTimeout(checkoutAutoRetryTimer_);
+    if(!authNeedsReentry_){
+      const wait = Math.min(60000, 10000 * Math.pow(2, Math.min(checkoutAutoRetryCount_-1, 3)));
+      checkoutAutoRetryTimer_ = setTimeout(()=>{
+        if(window.__pendingCheckoutOrders && !cloudPushInFlight) attemptCheckoutPush_();
+      }, wait);
+    }
+  }
+}
+let checkoutAutoRetryCount_ = 0;
+let checkoutAutoRetryTimer_ = null;
+// ---------- 2026-10-20：「一定產生LINE清單」 ----------
+// 待分享清單：結帳送出的單號先記在手機裡，確認後台真的收到、而且清單打開過，才移除。
+// 就算中途網路斷、App被關掉重開，之後只要確認後台有這張單，就會補出清單（不會再發生
+// 「單已經進系統、LINE清單卻沒出來，只能截圖給廠商」）。
+const PENDING_SHARE_KEY = 'kaokaozhu_pending_share_v1';
+function getPendingShare_(){ try{ return JSON.parse(localStorage.getItem(PENDING_SHARE_KEY)||'[]')||[]; }catch(e){ return []; } }
+function setPendingShare_(ids){ try{ ids.length ? localStorage.setItem(PENDING_SHARE_KEY, JSON.stringify(ids)) : localStorage.removeItem(PENDING_SHARE_KEY); }catch(e){} }
+function addPendingShare_(ids){ const cur = getPendingShare_(); ids.forEach(id=>{ if(cur.indexOf(id)<0) cur.push(id); }); setPendingShare_(cur); }
+function removePendingShare_(ids){ setPendingShare_(getPendingShare_().filter(id=>ids.indexOf(id)<0)); }
+// 已確認送達、但清單還沒打開過的單 → 用「不擋操作」的綠色提示列，讓店員自己點開
+let confirmedUnsharedIds_ = [];
+function onCloudOrdersConfirmed_(cloudOrderIds){
+  const pending = getPendingShare_();
+  if(!pending.length || !Array.isArray(cloudOrderIds)) return;
+  const set = {}; cloudOrderIds.forEach(id=>{ set[id]=true; });
+  const arrived = pending.filter(id=>set[id]);
+  if(!arrived.length) return;
+  // 正在結帳頁等結果的那一批：直接交給結帳流程處理（它會自己打開清單）
+  const waiting = (window.__pendingCheckoutOrders||[]).map(o=>o.id);
+  if(waiting.length && waiting.every(id=>set[id])){
+    const onCheckout = document.getElementById('page-checkout').classList.contains('active');
+    if(onCheckout){
+      const orders = window.__pendingCheckoutOrders;
+      window.__pendingCheckoutOrders = null;
+      const retryBtn = document.getElementById('checkoutRetryBtn'); if(retryBtn) retryBtn.style.display = 'none';
+      openShareModal(orders);
+      return;
+    }
+    window.__pendingCheckoutOrders = null;
+  }
+  arrived.forEach(id=>{ if(confirmedUnsharedIds_.indexOf(id)<0) confirmedUnsharedIds_.push(id); });
+  renderPendingShareBar_();
+}
+function renderPendingShareBar_(){
+  const bar = document.getElementById('pendingShareBar');
+  if(!bar) return;
+  confirmedUnsharedIds_ = confirmedUnsharedIds_.filter(id=>db.orders.some(o=>o.id===id));
+  const n = confirmedUnsharedIds_.length;
+  const txt = document.getElementById('pendingShareText');
+  if(txt) txt.textContent = `✅ ${n} 張單已送達，叫貨清單還沒傳給廠商`;
+  bar.classList.toggle('show', n>0 && !!currentAccount && !isReadonly());
+}
+function openPendingShare_(){
+  const orders = confirmedUnsharedIds_.map(id=>db.orders.find(o=>o.id===id)).filter(Boolean);
+  if(orders.length) openShareModal(orders);
+}
+// 直接問後台：這幾張單號在不在（只讀，不改任何資料）
+async function verifyOrdersInCloud_(ids){
+  const url = getGasUrl();
+  if(!url || !ids || !ids.length) return false;
+  try{
+    const res = await Promise.race([
+      fetch(url).then(r=>r.json()),
+      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), 15000)),
+    ]);
+    if(!res || !res.ok || !res.data) return false;
+    const remote = JSON.parse(res.data);
+    const cloudIds = (remote.orders||[]).map(o=>o.id);
+    return ids.every(id=>cloudIds.indexOf(id)>=0);
+  }catch(e){ return false; }
+}
+function retryCheckoutPush(){ return attemptCheckoutPush_(); }
+
+/* ---------- LINE分享文字 ---------- */
+function buildLineText(order){
+  let lines = [];
+  lines.push(`【叫貨清單】燒酒烤烤豬`);
+  lines.push(`供應商：${order.supplierName}`);
+  lines.push(`交貨日期：${order.deliveryDate}`);
+  lines.push('———');
+  order.items.forEach(it=>{
+    lines.push(`${it.name}　x${it.qty}　（${it.unit}）`);
+  });
+  lines.push('———');
+  if(order.note) lines.push(`備註：${order.note}`);
+  lines.push(`訂單編號：${order.id}`);
+  return lines.join('\n');
+}
+function openShareModal(orders){
+  document.getElementById('shareTitle').textContent = `訂單已建立（共 ${orders.length} 張）`;
+  const wrap = document.getElementById('sharePreviewList');
+  wrap.innerHTML = orders.map(o=>{
+    const text = buildLineText(o);
+    const encoded = encodeURIComponent(text);
+    return `<div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px;color:var(--brand);">${escapeHtml(o.supplierName)}</div>
+      <div class="line-preview selectable">${escapeHtml(text)}</div>
+      <div class="share-row">
+        <button class="btn-line" onclick="openLineShare_('${o.id}')">開啟LINE分享</button>
+        <button class="btn-copy" onclick="copyText('${o.id}')">複製文字</button>
+      </div>
+    </div>`;
+  }).join('');
+  window.__shareTexts = {};
+  orders.forEach(o=> window.__shareTexts[o.id]=buildLineText(o));
+  document.getElementById('shareModal').classList.add('show');
+  const ids = orders.map(o=>o.id);
+  removePendingShare_(ids);
+  confirmedUnsharedIds_ = confirmedUnsharedIds_.filter(id=>ids.indexOf(id)<0);
+  renderPendingShareBar_();
+}
+// 2026-10-20：從LINE點開的系統（LINE內建瀏覽器）會擋「另開新視窗」，原本按「開啟LINE分享」沒反應。
+// 改成：在LINE裡面 → 直接在同一個畫面前往LINE分享（LINE允許，會跳出選聯絡人）；
+// 在Safari／Chrome → 照原本另開；萬一被擋，也改用同一畫面前往。
+function isLineInAppBrowser_(){ return /\bLine\//i.test(navigator.userAgent||''); }
+function openLineShare_(orderId){
+  const text = (window.__shareTexts||{})[orderId] || '';
+  const url = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+  if(isLineInAppBrowser_()){ window.location.href = url; return; }
+  let w = null;
+  try{ w = window.open(url, '_blank'); }catch(e){ w = null; }
+  if(!w) window.location.href = url;
+}
+// 複製：先用新式複製；LINE內建瀏覽器常擋，就改用相容性最高的舊式複製；再不行就把文字選起來讓店員長按複製
+function copyText(orderId){
+  const text = (window.__shareTexts||{})[orderId] || '';
+  const legacyCopy = ()=>{
+    let ok = false;
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly','');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;';
+      document.body.appendChild(ta);
+      ta.focus(); ta.select(); try{ ta.setSelectionRange(0, text.length); }catch(e){}
+      ok = document.execCommand && document.execCommand('copy');
+      document.body.removeChild(ta);
+    }catch(e){ ok = false; }
+    if(ok){ showToast('已複製文字，可到LINE貼上'); return; }
+    // 最後備案：把這張單的文字整段選起來，店員長按就能複製
+    const idx = Object.keys(window.__shareTexts||{}).indexOf(orderId);
+    const box = document.querySelectorAll('#sharePreviewList .line-preview')[idx];
+    if(box){
+      try{ const r = document.createRange(); r.selectNodeContents(box); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }catch(e){}
+      box.scrollIntoView({block:'center'});
+    }
+    showToast('文字已選取，請長按選取的文字 →「拷貝」');
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext){
+    navigator.clipboard.writeText(text).then(()=>showToast('已複製文字，可到LINE貼上')).catch(legacyCopy);
+  } else {
+    legacyCopy();
+  }
+}
+function closeShareModal(){
+  document.getElementById('shareModal').classList.remove('show');
+  goPage('page-order'); switchTab('order');
+}
+
+/* ---------- 收貨對帳（例外提示制） ---------- */
+/* ---------- 整月叫貨明細（逐筆／彙總） ---------- */
+let monthlyMode = 'item';
+function openMonthlyView(){
+  const now = new Date();
+  const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  document.getElementById('monthlyPicker').value = ym;
+  goPage('page-monthly');
+  renderMonthlyView();
+}
+function setMonthlyMode(mode){
+  monthlyMode = mode;
+  document.getElementById('monthlyModeItem').classList.toggle('on', mode==='item');
+  document.getElementById('monthlyModeSum').classList.toggle('on', mode==='sum');
+  renderMonthlyView();
+}
+function orderAmount(o){
+  if(o.status==='done' && o.receivedTotal!=null) return o.receivedTotal;
+  return o.items.reduce((s,it)=>s+it.qty*it.price,0);
+}
+function renderMonthlyView(){
+  const ym = document.getElementById('monthlyPicker').value;
+  const wrap = document.getElementById('monthlyBody');
+  if(!ym){ wrap.innerHTML='<div class="empty">請先選擇月份</div>'; return; }
+  const orders = db.orders.filter(o => (o.createdAtISO||'').slice(0,7) === ym);
+  if(orders.length===0){ wrap.innerHTML='<div class="empty">這個月份沒有叫貨紀錄</div>'; return; }
+
+  if(monthlyMode==='item'){
+    let total = 0;
+    let html = orders.map(o=>{
+      const amt = orderAmount(o);
+      total += amt;
+      return `<div class="order-card">
+        <div class="row1"><div><div class="oid">${o.id}・${o.createdAt}</div>
+        <div class="oname">${escapeHtml(o.supplierName)}</div></div>
+        <span class="status-pill ${o.status==='done'?'status-done':'status-sent'}">${o.status==='done'?'已完成':'已發送'}</span></div>
+        <div style="text-align:right;font-size:15px;font-weight:700;margin-top:6px;">NTD ${amt.toFixed(0)}</div>
+      </div>`;
+    }).join('');
+    html += `<div class="card" style="background:var(--charcoal);color:#fff;text-align:right;font-size:17px;font-weight:700;">
+      本月總計（共${orders.length}筆）　NTD ${total.toFixed(0)}</div>`;
+    wrap.innerHTML = html;
+  } else {
+    const bySupplier = {};
+    orders.forEach(o=>{
+      if(!bySupplier[o.supplierName]) bySupplier[o.supplierName] = {count:0, total:0};
+      bySupplier[o.supplierName].count++;
+      bySupplier[o.supplierName].total += orderAmount(o);
+    });
+    const rows = Object.entries(bySupplier).sort((a,b)=>b[1].total-a[1].total);
+    const grand = rows.reduce((s,[,v])=>s+v.total,0);
+    let html = rows.map(([name,v])=>`
+      <div class="order-card"><div class="row1">
+        <div><div class="oname">${escapeHtml(name)}</div><div class="oid">共 ${v.count} 筆訂單</div></div>
+        <div style="font-size:16px;font-weight:700;">NTD ${v.total.toFixed(0)}</div>
+      </div></div>`).join('');
+    html += `<div class="card" style="background:var(--charcoal);color:#fff;text-align:right;font-size:17px;font-weight:700;">
+      本月總計（共${orders.length}筆）　NTD ${grand.toFixed(0)}</div>`;
+    wrap.innerHTML = html;
+  }
+}
+
+function renderReceive(){
+  state.receiveDetailId = null;
+  const wrap = document.getElementById('receiveList');
+  const sentOrders = db.orders.filter(o=>o.status==='sent');
+  const doneOrders = db.orders.filter(o=>o.status==='done').slice(0,10);
+  let html='';
+  if(sentOrders.length===0 && doneOrders.length===0){
+    html = '<div class="empty">目前沒有待收貨的訂單</div>';
+  }
+  sentOrders.forEach(o=>{
+    html += `<div class="order-card">
+      <div class="row1"><div><div class="oid">${o.id}</div><div class="oname">${escapeHtml(o.supplierName)}</div>
+      <div class="oid">下單時間：${o.createdAt}・交貨日：${o.deliveryDate||'—'}</div></div>
+      <span class="status-pill status-sent">已發送</span></div>
+      <div class="recv-tap" onclick="openReceiveDetail('${o.id}')">前往收貨對帳 ›</div>
+    </div>`;
+  });
+  if(doneOrders.length){
+    html += `<div class="page-title" style="margin-top:16px;">近期已完成</div>`;
+    doneOrders.forEach(o=>{
+      const hasDiff = o.received && o.received.some(r=>r.diff);
+      html += `<div class="order-card"><div class="row1"><div><div class="oid">${o.id}</div>
+        <div class="oname">${escapeHtml(o.supplierName)}</div>
+        <div class="oid">下單：${o.createdAt}${o.completedAt?`・完成收貨：${o.completedAt}`:''}</div></div>
+        <span class="status-pill status-done">${hasDiff?'完成（有差異）':'完成收貨'}</span></div></div>`;
+    });
+  }
+  wrap.innerHTML = html;
+}
+function openReceiveDetail(orderId){
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o){ renderReceive(); showToast('這張單已不存在（可能已被刪除）'); return; }
+  state.receiveDetailId = orderId;
+  const wrap = document.getElementById('receiveList');
+  let rows = o.items.map((it,idx)=>`
+    <div class="recv-item" id="recv-${idx}" style="flex-direction:column;align-items:stretch;gap:6px;">
+      <span>${escapeHtml(it.name)}${it.added?' <span style="color:var(--brand);font-weight:700;">〔臨時追加〕</span>':''}（訂 x${it.qty}　${escapeHtml(it.unit)}，訂購單價 NTD ${it.price}）</span>
+      <div style="display:flex;justify-content:space-between;gap:10px;">
+        <span style="flex:1;">實收數量
+          <input type="number" step="any" value="${it.qty}" data-idx="${idx}" data-field="qty" style="width:100%;"
+            oninput="onReceiveFieldChange('${orderId}', ${idx})" ${isReadonly()?'disabled':''}></span>
+        <span style="flex:1;">實收單價
+          <input type="number" step="any" value="${it.price}" data-idx="${idx}" data-field="price" style="width:100%;"
+            oninput="onReceiveFieldChange('${orderId}', ${idx})" ${isReadonly()?'disabled':''}></span>
+      </div>
+      <div style="text-align:right;font-size:12px;color:var(--gray);">小計 NTD <span id="lineTotal-${idx}">${money(it.qty*it.price)}</span></div>
+    </div>`).join('');
+  const addLogHtml = (o.addLog && o.addLog.length) ? `
+    <div style="margin-top:10px;background:var(--gray-bg);border-radius:10px;padding:8px 10px;">
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px;">📝 臨時追加紀錄</div>
+      ${o.addLog.map(l=>`<div class="log-row">${escapeHtml(l.itemName)} x${l.qty}　<span style="color:var(--gray);">${l.at}・${escapeHtml(l.role||'')}追加</span></div>`).join('')}
+    </div>` : '';
+  wrap.innerHTML = `<div class="card">
+    <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(o.supplierName)}</div>
+    <div style="font-size:11px;color:var(--gray);margin-bottom:2px;">數量／單價都可修改，跟送貨單金額不同時請直接調整</div>
+    <div style="font-size:12px;color:var(--brand);font-weight:700;margin-bottom:10px;">↩️ 如遇退貨，數量或金額可直接輸入負數（例如 -2），系統會自動從總額扣除</div>
+    <div class="recv-draft-hint" id="recvDraftHint" style="display:none;">💾 已恢復你上次填到一半的數字（每改一格都會自動暫存）</div>
+    ${rows}
+    ${addLogHtml}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;
+      padding-top:12px;border-top:2px solid var(--charcoal);font-size:16px;font-weight:700;">
+      <span>這筆訂單實收總額</span><span>NTD <span id="receiveGrandTotal">${money(o.items.reduce((s,it)=>s+it.qty*it.price,0))}</span></span>
+    </div>
+    <div style="font-size:11px;color:var(--gray);text-align:right;margin-top:2px;">請跟供應商送貨單上的金額核對</div>
+    ${(o.status==='sent' && !isReadonly())?`<button class="icon-btn" style="width:100%;margin-top:10px;" onclick="openAddItemsToOrder('${orderId}')">➕ 這張單還沒收貨，臨時追加品項</button>`:''}
+    ${!isReadonly()?`<button class="all-ok-btn" onclick="allOkReceive('${orderId}')">✓ 全部到齊、金額無誤，一鍵確認</button>
+    <button class="confirm-recv-btn" onclick="confirmReceive('${orderId}')">確認收貨並封存</button>`:''}
+    ${isStoreAdmin()?`<button class="icon-btn" style="width:100%;margin-top:10px;color:var(--warn);" onclick="deleteOrder('${orderId}')">🗑 刪除這張訂單（測試單／誤建單用，無法復原）</button>`:''}
+    <div style="text-align:center;margin-top:10px;"><span onclick="renderReceive()" style="font-size:12px;color:var(--gray);">‹ 返回列表</span></div>
+  </div>`;
+  applyReceiveDraft_(o);
+}
+// ---------- 2026-10-20：收貨草稿（隨打隨存） ----------
+// 每改一格就存在這支手機上（不上雲端，避免半成品被別台裝置當成正式資料）。
+// 跳出去、接電話、App被重新整理，回來打開同一張單，數字都還在。按「確認收貨」成功後才清掉。
+const RECV_DRAFT_KEY = 'kaokaozhu_recv_draft_v1';
+function loadRecvDrafts_(){ try{ return JSON.parse(localStorage.getItem(RECV_DRAFT_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function saveRecvDrafts_(d){ try{ localStorage.setItem(RECV_DRAFT_KEY, JSON.stringify(d)); }catch(e){} }
+function saveRecvDraftField_(orderId, idx){
+  const q = document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`);
+  const p = document.querySelector(`input[data-idx="${idx}"][data-field="price"]`);
+  if(!q || !p) return;
+  const d = loadRecvDrafts_();
+  if(!d[orderId]) d[orderId] = { savedAt: nowISO(), fields: {} };
+  d[orderId].fields[idx] = { qty: q.value, price: p.value };
+  d[orderId].savedAt = nowISO();
+  saveRecvDrafts_(d);
+}
+function clearRecvDraft_(orderId){ const d = loadRecvDrafts_(); if(d[orderId]){ delete d[orderId]; saveRecvDrafts_(d); } }
+function applyReceiveDraft_(o){
+  if(o.status!=='sent') return;
+  const d = loadRecvDrafts_()[o.id];
+  if(!d || !d.fields) return;
+  let applied = 0;
+  Object.keys(d.fields).forEach(idx=>{
+    const f = d.fields[idx];
+    const q = document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`);
+    const p = document.querySelector(`input[data-idx="${idx}"][data-field="price"]`);
+    if(!q || !p || !f) return;
+    q.value = f.qty; p.value = f.price; applied++;
+    try{ onReceiveFieldChange(o.id, Number(idx), true); }catch(e){}
+  });
+  const hint = document.getElementById('recvDraftHint');
+  if(hint && applied) hint.style.display = '';
+}
+/* ---------- 已送出訂單臨時追加品項（Eva實測需求：漏叫、緊急追加時，不用再開一張新單） ----------
+   限制在status==='sent'（還沒收貨確認）的單子上才能用，一旦收貨確認封存（status==='done'）
+   就不能再追加，避免帳務對不上。每次追加都寫進o.addLog留紀錄，畫面上也會標記「臨時追加」，
+   讓大家知道這張單被動過、動了什麼，不是偷偷改掉原單內容。 */
+function openAddItemsToOrder(orderId){
+  if(isReadonly()) return;
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o || o.status!=='sent') return;
+  state.receiveDetailId = orderId;
+  const wrap = document.getElementById('receiveList');
+  const items = sortedItemsForSupplier(o.supplierId);
+  if(items.length===0){ wrap.innerHTML = `<div class="card"><div class="empty">這家供應商目前沒有品項可以追加</div>
+    <div style="text-align:center;margin-top:10px;"><span onclick="openReceiveDetail('${orderId}')" style="font-size:12px;color:var(--gray);">‹ 返回</span></div></div>`; return; }
+  const rows = items.map(it=>`
+    <div class="item-row" id="addpick-${it.id}">
+      <div class="item-info">
+        <div class="item-name">${escapeHtml(it.name)}</div>
+        <div class="item-price-row">單價 NTD ${it.price}／${escapeHtml(it.unit)}</div>
+      </div>
+      <div class="item-controls">
+        <input type="number" step="any" min="0" class="qty-input" data-additem="${it.id}" placeholder="0">
+      </div>
+    </div>`).join('');
+  wrap.innerHTML = `<div class="card">
+    <div style="font-weight:700;margin-bottom:4px;">${escapeHtml(o.supplierName)}－臨時追加品項</div>
+    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">填要追加的數量，跟這張單原本的品項無關，只會加不會改到原本訂的內容</div>
+    ${rows}
+    <button class="all-ok-btn" style="margin-top:12px;" onclick="confirmAddItemsToOrder('${orderId}')">確認追加</button>
+    <div style="text-align:center;margin-top:10px;"><span onclick="openReceiveDetail('${orderId}')" style="font-size:12px;color:var(--gray);">‹ 取消，返回這張單</span></div>
+  </div>`;
+}
+function confirmAddItemsToOrder(orderId){
+  if(isReadonly()) return;
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o || o.status!=='sent') return;
+  const inputs = document.querySelectorAll('input[data-additem]');
+  let addedCount = 0;
+  const addedThisRound = []; // 只記這次追加的品項，等一下產生「追加通知」文字用，不要把原本訂的品項也混進去
+  const nowLabel = new Date().toLocaleString('zh-TW',{hour12:false});
+  if(!o.addLog) o.addLog = [];
+  inputs.forEach(inp=>{
+    const qty = parseFloat(inp.value);
+    if(!qty || qty<=0) return;
+    const itemId = inp.getAttribute('data-additem');
+    const item = db.items.find(i=>i.id===itemId);
+    if(!item) return;
+    const existing = o.items.find(x=>x.itemId===itemId);
+    if(existing){ existing.qty += qty; }
+    else { o.items.push({itemId:item.id, code:item.code, name:item.name, unit:item.unit, price:item.price, qty, added:true}); }
+    o.addLog.push({itemName:item.name, qty, at:nowLabel, atISO:nowISO(), role: currentAccount?currentAccount.role:''});
+    addedThisRound.push({name:item.name, qty, unit:item.unit});
+    addedCount++;
+  });
+  if(addedCount===0){ showToast('沒有填寫要追加的數量'); return; }
+  o.updatedAt = nowISO();
+  saveDB();
+  openAddedItemsShare(o, addedThisRound);
+  showToast(`已追加${addedCount}項品項到這張單`);
+}
+/* 追加完之後，直接把「這次追加了什麼」整理成一段文字，方便馬上轉發給供應商
+   （Eva實測的情境是賣完臨時缺貨、要緊急跟供應商追加，不是回頭看訂單而已），
+   不用再回原本的分享畫面重新組一次全部品項，也不會把原本訂的品項混進去搞混供應商。 */
+function buildAddedItemsLineText(order, addedLines){
+  let lines = [];
+  lines.push(`【追加叫貨】${order.supplierName}`);
+  lines.push(`原訂單編號：${order.id}`);
+  lines.push('———');
+  addedLines.forEach(it=>{ lines.push(`${it.name}　x${it.qty}　（${it.unit}）`); });
+  lines.push('———');
+  lines.push('以上為原訂單之外，臨時追加的品項，麻煩一併出貨，謝謝！');
+  return lines.join('\n');
+}
+function openAddedItemsShare(order, addedLines){
+  const wrap = document.getElementById('receiveList');
+  const text = buildAddedItemsLineText(order, addedLines);
+  const encoded = encodeURIComponent(text);
+  window.__addedShareText = text;
+  wrap.innerHTML = `<div class="card">
+    <div style="font-weight:700;margin-bottom:6px;color:var(--brand);">✓ 已追加，要不要順便通知供應商？</div>
+    <div class="line-preview">${escapeHtml(text)}</div>
+    <div class="share-row">
+      <button class="btn-line" onclick="window.open('https://line.me/R/share?text=${encoded}','_blank')">開啟LINE分享</button>
+      <button class="btn-copy" onclick="navigator.clipboard?.writeText(window.__addedShareText).then(()=>showToast('已複製文字，可貼到LINE')).catch(()=>showToast('複製失敗，請手動選取文字'))">複製文字</button>
+    </div>
+    <div style="text-align:center;margin-top:14px;"><span onclick="openReceiveDetail('${order.id}')" style="font-size:12px;color:var(--gray);">‹ 不用了，返回這張單</span></div>
+  </div>`;
+}
+function onReceiveFieldChange(orderId, idx, fromDraft){
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  if(!fromDraft) saveRecvDraftField_(orderId, idx);
+  const qtyInp = document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`);
+  const priceInp = document.querySelector(`input[data-idx="${idx}"][data-field="price"]`);
+  const qty = parseFloat(qtyInp.value)||0;
+  const price = parseFloat(priceInp.value)||0;
+  const lineTotal = money(qty*price);
+  const lineTotalEl = document.getElementById('lineTotal-'+idx);
+  lineTotalEl.textContent = lineTotal;
+  lineTotalEl.style.color = lineTotal<0 ? 'var(--warn)' : 'inherit';
+  lineTotalEl.style.fontWeight = lineTotal<0 ? '700' : 'normal';
+  const row = document.getElementById('recv-'+idx);
+  const it = o.items[idx];
+  row.classList.toggle('diff', qty!==it.qty || price!==it.price);
+  let grand = 0;
+  o.items.forEach((_,i)=>{
+    const q = parseFloat(document.querySelector(`input[data-idx="${i}"][data-field="qty"]`)?.value)||0;
+    const p = parseFloat(document.querySelector(`input[data-idx="${i}"][data-field="price"]`)?.value)||0;
+    grand += q*p;
+  });
+  grand = money(grand);
+  const grandEl = document.getElementById('receiveGrandTotal');
+  grandEl.textContent = grand;
+  grandEl.style.color = grand<0 ? 'var(--warn)' : 'inherit';
+}
+function allOkReceive(orderId){
+  if(isReadonly()) return; // 唯讀身份不可變更收貨資料（畫面按鈕已隱藏，這裡再擋一次避免被繞過）
+  const o = db.orders.find(x=>x.id===orderId);
+  o.items.forEach((it,idx)=>{
+    document.querySelector(`input[data-idx="${idx}"][data-field="qty"]`).value = it.qty;
+    document.querySelector(`input[data-idx="${idx}"][data-field="price"]`).value = it.price;
+    document.getElementById('lineTotal-'+idx).textContent = money(it.qty*it.price);
+    document.getElementById('recv-'+idx).classList.remove('diff');
+  });
+  document.getElementById('receiveGrandTotal').textContent = money(o.items.reduce((s,it)=>s+it.qty*it.price,0));
+  o.items.forEach((it,idx)=>saveRecvDraftField_(orderId, idx));
+  showToast('已標記全部到齊、金額無誤');
+}
+function confirmReceive(orderId, opts){
+  opts = opts || {};
+  if(isReadonly()) return; // 唯讀身份不可確認收貨（畫面按鈕已隱藏，這裡再擋一次避免被繞過）
+  const o = db.orders.find(x=>x.id===orderId);
+  // 2026-10-20：這張單可能在填寫期間被別台裝置收貨／刪除了，避免重複收貨或程式出錯
+  if(!o){ showToast('這張單已不存在（可能已被刪除）'); clearRecvDraft_(orderId); renderReceive(); return; }
+  if(o.status==='done'){ showToast('這張單已經由其他裝置完成收貨了'); clearRecvDraft_(orderId); renderReceive(); return; }
+  const fieldEl = (idx, f) => document.querySelector(`input[data-idx="${idx}"][data-field="${f}"]`);
+  // 2026-10-14新增：實收數量／單價如果被清空（沒填），以前會默默當成0，帳就變成「沒收到」。
+  // 送出前先找出空白的品項，讓店家確認是真的沒收到，還是漏填。
+  if(!opts.skipBlankCheck){
+    const blanks = [];
+    o.items.forEach((it,idx)=>{
+      ['qty','price'].forEach(f=>{
+        const el = fieldEl(idx, f);
+        if(el && String(el.value).trim()===''){ blanks.push(`${it.name}（${f==='qty'?'實收數量':'實收單價'}）`); }
+      });
+    });
+    if(blanks.length){
+      const goOn = window.confirm(`有 ${blanks.length} 個欄位是空白的，送出後會當成 0：\n\n${blanks.join('\n')}\n\n確定這些真的是 0（沒收到／免費）嗎？\n按「取消」回去補填。`);
+      if(!goOn) return;
+    }
+  }
+  const received = [];
+  o.items.forEach((it,idx)=>{
+    const qEl = fieldEl(idx,'qty'), pEl = fieldEl(idx,'price');
+    // 畫面上找不到這一格（例如填寫期間別台裝置追加了品項）→ 用訂購數量／單價，不讓整個收貨失敗
+    const actualQty = qEl ? (parseFloat(qEl.value)||0) : it.qty;
+    const actualPrice = pEl ? money(parseFloat(pEl.value)||0) : it.price;
+    received.push({name:it.name, orderedQty:it.qty, actualQty, orderedPrice:it.price, actualPrice,
+      diff: (actualQty!==it.qty || actualPrice!==it.price)});
+  });
+  // 2026-10-20 改價防呆（Barbara選A）：漲跌超過30%的品項，在按「確認收貨」這一下集中確認一次，
+  // 避免打錯一個數字（78打成780）就把錯的價格寫進品項，之後每張單都帶錯價。填寫途中不打斷。
+  if(!opts.priceDecision){
+    const big = findBigPriceChanges_(o, received);
+    if(big.length){ showPriceGuard_(orderId, big); return; }
+  }
+  o.received = received;
+  o.receivedTotal = money(received.reduce((s,r)=>s+r.actualQty*r.actualPrice,0));
+  o.status='done';
+  o.completedAt = new Date().toLocaleString('zh-TW',{hour12:false});
+  o.completedAtISO = nowISO(); // 2026-10-28：盤存月均價依「實際收貨月份」計算用
+  o.updatedAt = nowISO();
+  // 2026-10-01新增：記收貨確認人帳號，理由同下單人——後台報表要直接看得到「誰收的貨」。
+  o.receivedByAccount = currentAccount ? `${currentAccount.name||currentAccount.account}（${currentAccount.role}）` : '未登入';
+  {
+    const hasDiff = received.some(r=>r.diff);
+    const summary = hasDiff
+      ? `有差異：${received.filter(r=>r.diff).map(r=>`${r.name}（訂${r.orderedQty}/收${r.actualQty}）`).join('、')}`
+      : '全部到齊、金額無誤';
+    logAction('收貨確認', o.supplierName, `${o.id} / ${summary}`);
+  }
+  const skipIds = opts.priceDecision==='keep' ? (opts.bigItemIds||[]) : [];
+  const priceUpdates = autoUpdatePricesFromReceive_(o, received, skipIds);
+  clearRecvDraft_(orderId);
+  saveDB(); renderReceive();
+  showToast(priceUpdates.length ? `已完成收貨確認；${priceUpdates.join('、')}` : '已完成收貨確認');
+}
+// 找出「會觸發自動改價、而且漲跌超過30%」的品項（規則跟autoUpdatePricesFromReceive_一致）
+const PRICE_GUARD_RATIO = 0.3;
+function priceUpdateCandidates_(o, received){
+  const out = [];
+  if(!o || !Array.isArray(o.items)) return out;
+  const orderISO = o.createdAtISO || EPOCH_ISO;
+  o.items.forEach((it, idx)=>{
+    const r = received[idx];
+    if(!r || !it.itemId) return;
+    const item = db.items.find(i=>i.id===it.itemId);
+    if(!item) return;
+    const cur = (typeof item.price==='number') ? item.price : parseFloat(item.price);
+    if(!(cur > 0)) return;
+    if(!(r.actualPrice > 0) || !(r.actualQty > 0)) return;
+    if(r.actualPrice === cur) return;
+    const lastChange = (db.priceLog||[]).filter(l=>l && l.itemId===item.id)
+      .reduce((m,l)=> ((l.timeISO||EPOCH_ISO) > m ? (l.timeISO||EPOCH_ISO) : m), EPOCH_ISO);
+    if(!(orderISO > lastChange)) return;
+    if(out.some(x=>x.item.id===item.id)) return;
+    out.push({item, cur, next:r.actualPrice});
+  });
+  return out;
+}
+function findBigPriceChanges_(o, received){
+  return priceUpdateCandidates_(o, received).filter(c=>Math.abs(c.next - c.cur)/c.cur > PRICE_GUARD_RATIO);
+}
+let priceGuardCtx_ = null;
+function showPriceGuard_(orderId, big){
+  priceGuardCtx_ = { orderId, bigItemIds: big.map(c=>c.item.id) };
+  const list = document.getElementById('priceGuardList');
+  list.innerHTML = big.map(c=>{
+    const pct = Math.round((c.next - c.cur)/c.cur*100);
+    return `<div class="price-guard-row"><span>${escapeHtml(c.item.name)}</span>
+      <span>${c.cur} → <b>${c.next}</b>（<span style="color:${pct>0?'var(--warn)':'#3E7D4C'};font-weight:700;">${pct>0?'+':''}${pct}%</span>）</span></div>`;
+  }).join('');
+  document.getElementById('priceGuardModal').classList.add('show');
+}
+function resolvePriceGuard_(choice){
+  document.getElementById('priceGuardModal').classList.remove('show');
+  const ctx = priceGuardCtx_; priceGuardCtx_ = null;
+  if(!ctx || choice==='back') return;
+  confirmReceive(ctx.orderId, { priceDecision: choice, bigItemIds: ctx.bigItemIds, skipBlankCheck: true });
+}
+// 2026-10-18（Barbara選「自動」）：收貨時輸入的實收單價跟品項目前單價不同，就自動把品項單價改成新價，
+// 下次下單直接顯示新價。例：建檔雞蛋80，收貨輸入90 → 品項單價變90。
+// 不動的情況：實收單價或數量≤0（含退貨負數、0元）、品項目前單價≤0或留空（浮動價）、
+// 這張單比「品項最近一次改價」還舊（晚收的舊單不能把新價蓋回舊價）。已送出的舊單金額不變。
+function autoUpdatePricesFromReceive_(o, received, skipItemIds){
+  const msgs = [];
+  const skip = skipItemIds || [];
+  priceUpdateCandidates_(o, received).forEach(c=>{
+    if(skip.indexOf(c.item.id)>=0) return; // 店長選「這次照實收入帳，不改單價」
+    const item = c.item, cur = c.cur, next = c.next;
+    const t = nowISO();
+    item.price = next;
+    item.updatedAt = t;
+    db.priceLog.unshift({id:'pl'+Math.random().toString(36).slice(2)+Date.now(), itemId:item.id, itemName:item.name, old:cur, next,
+      role: currentAccount?currentAccount.role:'', time:new Date().toLocaleString('zh-TW',{hour12:false}), timeISO:t});
+    logAction('收貨自動改價', o.supplierName, `${item.name}：NTD ${cur} → NTD ${next}（依 ${o.id} 收貨）`);
+    msgs.push(`${item.name}單價已更新為 ${next}`);
+  });
+  return msgs;
+}
+
+/* ---------- 庫存盤點 ---------- */
+/* 2026-10-28（最初目標：「系統依當月平均叫貨單價，自動算出當月盤存總金額」）
+   規則（Barbara 確認）：
+   - 盤存金額 ＝ 盤點數量 × 當月平均單價
+   - 當月平均單價 ＝ 當月「已收貨」的實收總金額 ÷ 實收總數量（加權平均，退貨負數也算進去）
+   - 當月沒進貨：用最近一次有進貨那個月的平均單價；從沒進過貨：用品項目前單價
+   - 盤點數量按月份留存（item.stockByMonth），當月的數字也同步寫回 item.stockQty（相容舊畫面） */
+let stockFilterSupplier = 'all';
+function monthKeyNow_(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function monthKeyOfISO_(iso){ if(!iso) return ''; const d=new Date(iso); if(isNaN(d)) return ''; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function orderReceiveMonth_(o){
+  if(o.completedAtISO) return monthKeyOfISO_(o.completedAtISO);
+  if(o.deliveryDate && /^\d{4}-\d{2}/.test(o.deliveryDate)) return o.deliveryDate.slice(0,7);
+  return monthKeyOfISO_(o.updatedAt || o.createdAtISO);
+}
+// 每個品項、每個月份的實收合計 {itemId:{'2026-10':{amt,qty}}}
+function buildPurchaseStats_(){
+  const st = {};
+  (db.orders||[]).forEach(o=>{
+    if(o.status!=='done' || !Array.isArray(o.received)) return;
+    const mk = orderReceiveMonth_(o); if(!mk) return;
+    o.received.forEach((r,idx)=>{
+      const it = (o.items||[])[idx]; if(!it || !it.itemId || !r) return;
+      const q = Number(r.actualQty)||0, p = Number(r.actualPrice)||0;
+      if(!q) return;
+      const a = st[it.itemId] || (st[it.itemId] = {});
+      const m = a[mk] || (a[mk] = {amt:0, qty:0});
+      m.amt += q*p; m.qty += q;
+    });
+  });
+  return st;
+}
+// 回傳 {price, src}，src：'month'（本月加權平均）| 'prev'（沿用最近有進貨月份，附月份）| 'item'（品項單價）| 'none'
+function avgPriceFor_(item, month, stats){
+  const byM = stats[item.id] || {};
+  const cur = byM[month];
+  if(cur && cur.qty > 0) return {price: money(cur.amt/cur.qty), src:'month'};
+  const earlier = Object.keys(byM).filter(k=>k < month && byM[k].qty > 0).sort();
+  if(earlier.length){ const k = earlier[earlier.length-1]; return {price: money(byM[k].amt/byM[k].qty), src:'prev', from:k}; }
+  const p = Number(item.price)||0;
+  return p > 0 ? {price:p, src:'item'} : {price:0, src:'none'};
+}
+function stockQtyFor_(item, month){
+  const m = item.stockByMonth && item.stockByMonth[month];
+  if(m !== undefined && m !== null && m !== '') return Number(m)||0;
+  if(month === monthKeyNow_()) return Number(item.stockQty)||0;
+  return 0;
+}
+function setStockMonth_(v){ state.stockMonth = v || monthKeyNow_(); renderStock(); }
+function renderStock(){
+  if(!state.stockMonth) state.stockMonth = monthKeyNow_();
+  const month = state.stockMonth;
+  const monthInput = document.getElementById('stockMonth');
+  if(monthInput){ monthInput.value = month; monthInput.max = monthKeyNow_(); }
+  const filterWrap = document.getElementById('stockFilter');
+  filterWrap.innerHTML = `<button class="${stockFilterSupplier==='all'?'on':''}" onclick="setStockFilter('all')">全部</button>` +
+    db.suppliers.map(s=>`<button class="${stockFilterSupplier===s.id?'on':''}" onclick="setStockFilter('${s.id}')">${escapeHtml(s.name)}</button>`).join('');
+  const stats = buildPurchaseStats_();
+  // 本月盤存總額＋各供應商小計（總額永遠算全部品項，不受下方篩選影響）
+  let grand = 0; const bySup = {};
+  db.items.forEach(it=>{
+    const q = stockQtyFor_(it, month); if(!q) return;
+    const v = money(q * avgPriceFor_(it, month, stats).price);
+    grand += v; bySup[it.supplierId] = (bySup[it.supplierId]||0) + v;
+  });
+  const [yy, mm] = month.split('-');
+  const supRows = db.suppliers.filter(s=>bySup[s.id]).sort((a,b)=>bySup[b.id]-bySup[a.id])
+    .map(s=>`<div class="ss-row"><span>${escapeHtml(s.name)}</span><span>NTD ${money(bySup[s.id]).toLocaleString()}</span></div>`).join('');
+  document.getElementById('stockSummary').innerHTML = `<div class="stock-summary">
+      <div class="ss-label">${yy}年${Number(mm)}月 盤存總金額</div>
+      <div class="ss-total">NTD ${money(grand).toLocaleString()}</div>
+      <div class="ss-note">盤點數量 × 當月平均進貨單價（實收加權平均）</div>
+      ${supRows ? `<details class="ss-detail"><summary>依供應商看小計</summary>${supRows}</details>` : '<div class="ss-note">這個月還沒有輸入盤點數量</div>'}
+    </div>`;
+  const wrap = document.getElementById('stockList');
+  const items = db.items.filter(i=> stockFilterSupplier==='all' || i.supplierId===stockFilterSupplier)
+    .sort((a,b)=> a.supplierId===b.supplierId ? (a.sortIndex||0)-(b.sortIndex||0) : String(a.supplierId||'').localeCompare(String(b.supplierId||'')));
+  if(items.length===0){ wrap.innerHTML='<div class="empty">沒有品項</div>'; return; }
+  wrap.innerHTML = items.map(it=>{
+    const s = db.suppliers.find(x=>x.id===it.supplierId);
+    const myLogs = db.priceLog.filter(l=>l.itemId===it.id);
+    const q = stockQtyFor_(it, month);
+    const ap = avgPriceFor_(it, month, stats);
+    const srcTxt = ap.src==='month' ? '本月實收加權平均' : ap.src==='prev' ? `沿用 ${Number(ap.from.slice(5))} 月平均` : ap.src==='item' ? '本月沒進貨，用品項單價' : '尚無單價';
+    return `<div class="stock-row">
+      <div class="top"><div><div class="name">${escapeHtml(it.name)}</div>
+      <div class="meta">${escapeHtml(it.code||'—')} · ${escapeHtml(s?.name||'')}</div></div></div>
+      <div class="grid2">
+        <div class="mini-field"><label>單價 NTD／${escapeHtml(it.unit)}</label>
+          <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
+        <div class="mini-field"><label>${Number(month.slice(5))}月結餘（盤點數量）</label>
+          <input type="number" step="any" value="${q||''}" placeholder="0" ${isReadonly()?'disabled':''} onchange="updateStockQty('${it.id}', this.value); showSaved('${it.id}')"></div>
+      </div>
+      <div class="stock-value" id="sv-${it.id}">${q ? `${q} × NTD ${ap.price}（${srcTxt}）＝ <b>NTD ${money(q*ap.price).toLocaleString()}</b>` : `平均單價 NTD ${ap.price}（${srcTxt}）`}</div>
+      <div id="saved-${it.id}" style="font-size:11px;color:var(--ok);margin-top:4px;height:14px;"></div>
+      ${myLogs.length? `<div class="price-changed-tag" onclick="toggleItemHistory('${it.id}')" style="cursor:pointer;">📜 這個品項有 ${myLogs.length} 筆異動紀錄，點這裡查看 ›</div>
+      <div id="hist-${it.id}" style="display:none;margin-top:8px;background:var(--gray-bg);border-radius:10px;padding:8px 10px;">
+        ${myLogs.map(l=>`<div class="log-row">NTD ${l.old} → NTD ${l.next}　<span style="color:var(--gray);">${l.time}・${escapeHtml(l.role)}</span></div>`).join('')}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+function showSaved(itemId){
+  const el = document.getElementById('saved-'+itemId);
+  if(!el) return;
+  const t = new Date().toLocaleTimeString('zh-TW',{hour12:false});
+  el.textContent = `✓ 已自動儲存（${t}）`;
+}
+function toggleItemHistory(itemId){
+  const el = document.getElementById('hist-'+itemId);
+  el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+function setStockFilter(id){ stockFilterSupplier=id; renderStock(); }
+function updateStockQty(itemId, val){
+  if(isReadonly()) return; // 唯讀身份不可修改盤點數量（欄位已disabled，這裡再擋一次避免被繞過）
+  const item = db.items.find(i=>i.id===itemId);
+  if(!item) return;
+  const month = state.stockMonth || monthKeyNow_();
+  const q = parseFloat(val)||0;
+  if(!item.stockByMonth || typeof item.stockByMonth!=='object') item.stockByMonth = {};
+  item.stockByMonth[month] = q;
+  if(month === monthKeyNow_()) item.stockQty = q; // 當月的數字同步寫回（相容舊畫面）
+  item.updatedAt = nowISO();
+  saveDB();
+  // 只更新這一格的金額和最上方總額，不重畫整個清單（正在輸入下一格的不會被洗掉）
+  const stats = buildPurchaseStats_(); const ap = avgPriceFor_(item, month, stats);
+  const el = document.getElementById('sv-'+itemId);
+  if(el) el.innerHTML = q ? `${q} × NTD ${ap.price} ＝ <b>NTD ${money(q*ap.price).toLocaleString()}</b>` : `平均單價 NTD ${ap.price}`;
+  const sum = document.getElementById('stockSummary');
+  if(sum){ let grand=0; db.items.forEach(it=>{ const qq=stockQtyFor_(it, month); if(qq) grand += money(qq*avgPriceFor_(it, month, stats).price); });
+    const t = sum.querySelector('.ss-total'); if(t) t.textContent = 'NTD ' + money(grand).toLocaleString(); }
+}
+
+/* ---------- 供應商管理 + 異動紀錄 ---------- */
+function renderCloudSyncCard(){
+  const wrap = document.getElementById('cloudSyncCard');
+  if(!wrap) return;
+  if(!isMaintainer()){
+    wrap.innerHTML = `<div class="log-row">雲端同步設定僅「維護專員」身份可查看與修改</div>`;
+    return;
+  }
+  const url = getGasUrl();
+  wrap.innerHTML = `
+    <div class="field-row">
+      <label>GAS 網址（部署Google Apps Script後貼上）</label>
+      <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/xxx/exec" value="${escapeHtml(url)}">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="icon-btn" style="flex:1;" onclick="onSaveGasUrl()">儲存網址</button>
+      <button class="icon-btn" style="flex:1;" onclick="pullFromCloud(true)">↓ 從雲端載入</button>
+      <button class="icon-btn" style="flex:1;" onclick="pushToCloud()">↑ 立即上傳</button>
+    </div>
+    <div style="font-size:12px;color:var(--gray);margin-top:8px;">
+      設定好網址後，所有人操作的資料會自動同步到同一份雲端資料，不用手動按也會在儲存時自動上傳。
+    </div>
+    <div style="font-size:12px;color:var(--warn);margin-top:8px;font-weight:700;">
+      ⚠️ 這組網址是「${escapeHtml(db.settings.shopName||'本店')}」專屬的雲端資料表。若把這套系統複製給其他客戶當模板使用，
+      請務必在這裡改成新客戶自己的網址，否則新客戶的訂單資料會同步進這裡、混進本店資料。
+    </div>`;
+}
+function onSaveGasUrl(){
+  if(!isMaintainer()){ showToast('僅「維護專員」可以修改雲端同步網址'); return; }
+  const val = document.getElementById('gasUrlInput').value.trim();
+  setGasUrl(val);
+  showToast(val ? '已儲存雲端網址' : '已清空雲端網址（改回純本機模式）');
+  if(val) pullFromCloud(true); else setSyncStatus('offline');
+}
+
+/* ---------- 資料備份／還原 ----------
+   刪除品項/供應商/帳號目前都是刪了就沒了，沒有回收機制。
+   這裡提供最直接可靠的救命繩：把整個資料庫匯出成一個.json備份檔，
+   之後不管是誤刪、誤改，還是雲端資料出問題，都可以用備份檔整包還原。
+   僅「維護專員」（晨諾創意）可操作，因為這是系統層級的救援功能。 */
+function renderBackupCard(){
+  const wrap = document.getElementById('backupCard');
+  if(!wrap) return;
+  if(!isMaintainer()){
+    wrap.innerHTML = `<div class="log-row">資料備份／還原僅「維護專員」身份可操作</div>`;
+    return;
+  }
+  const supN = db.suppliers.length, itN = db.items.length, orN = db.orders.length, accN = db.accounts.length;
+  wrap.innerHTML = `
+    <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">
+      目前資料：${supN} 家供應商・${itN} 個品項・${orN} 筆訂單紀錄・${accN} 組帳號
+    </div>
+    <button class="icon-btn" style="width:100%;" onclick="exportBackup()">📦 匯出備份檔（.json）</button>
+    <div style="font-size:11px;color:var(--gray);margin:8px 0;">
+      建議每次改動比較大（例如匯入名單、調整很多品項）之後，順手匯出一份存起來，
+      萬一之後誤刪或改錯，都可以用下面的「還原備份」整包救回來。
+    </div>
+    <label class="icon-btn" style="width:100%;display:block;text-align:center;box-sizing:border-box;">
+      ♻️ 還原備份（上傳.json檔）
+      <input type="file" accept="application/json,.json" style="display:none;" onchange="importBackup(event)">
+    </label>
+    <div style="font-size:11px;color:var(--warn);font-weight:700;margin-top:6px;">
+      ⚠️ 還原備份會整包覆蓋目前所有資料（供應商、品項、訂單、帳號…），且會同步覆蓋雲端，請務必確認備份檔案沒錯再上傳。
+    </div>`;
+}
+function exportBackup(){
+  if(!isMaintainer()){ showToast('只有「維護專員」能匯出備份'); return; }
+  const ts = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const fname = `${(db.settings.shopName||'叫貨系統')}_備份_${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}.json`;
+  const blob = new Blob([JSON.stringify(db, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('備份檔已下載：' + fname);
+}
+function importBackup(evt){
+  if(!isMaintainer()){ showToast('只有「維護專員」能還原備份'); return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let parsed;
+    try{ parsed = JSON.parse(reader.result); }
+    catch(e){ showToast('這個檔案打不開，不是有效的備份檔'); evt.target.value=''; return; }
+    if(!parsed || !Array.isArray(parsed.suppliers) || !Array.isArray(parsed.items) || !Array.isArray(parsed.accounts)){
+      showToast('這個檔案格式不對，看起來不是本系統的備份檔');
+      evt.target.value=''; return;
+    }
+    if(parsed.accounts.length===0 || !parsed.accounts.some(a=>a && a.account && a.password)){
+      // 帳號清單是空的或裡面沒有一組帳密正常的帳號，還原下去會直接把所有人鎖在登入畫面外，且沒有救援手段
+      showToast('這份備份檔沒有任何有效帳號，為避免所有人被鎖在登入畫面外，已取消還原');
+      evt.target.value=''; return;
+    }
+    const ok = confirm(
+      `確定要用這份備份檔還原嗎？\n\n備份內容：${parsed.suppliers.length}家供應商・${parsed.items.length}個品項・${(parsed.orders||[]).length}筆訂單・${parsed.accounts.length}組帳號\n\n這個動作會覆蓋目前所有資料（包含雲端），且無法復原。建議先按上面「匯出備份檔」保留目前的資料再繼續。`
+    );
+    if(!ok){ evt.target.value=''; return; }
+    db = parsed;
+    // 還原備份＝本機資料被整包換掉，雲端未必擁有這份內容的同步歷史，水位退回最早，
+    // 強制下面「saveDB()觸發雲端同步」那一次整包送出，不要冒險漏送。
+    resetLastSyncedAt_();
+    normalizeDbShape(); // 備份檔可能缺少settings/license/priceLog等欄位，先補齊，避免還原後畫面渲染一半壞掉
+    // 備份檔可能是舊格式（例如還沒拆分供應商、角色名稱是舊的），跟pullFromCloud()一樣，
+    // 還原後要重跑一次資料轉換，不然畫面會殘留舊格式資料，要等下次整頁重新整理才會修正。
+    migrateHanjiSplit();
+    migrateRoles();
+    mergeDuplicateSuppliers();
+    saveDBLocalOnly();
+    applySettings();
+    renderAll();
+    renderAdmin();
+    renderLicenseBanner();
+    renderLicenseGate();
+    saveDB(); // 觸發雲端同步，讓還原後的資料推上雲端、覆蓋掉舊的
+    showToast('已還原備份，資料已更新並同步至雲端');
+    evt.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+function renderAdmin(){
+  renderCloudSyncCard();
+  renderBackupCard();
+  renderAccountManage();
+  renderLicensePanel();
+  document.getElementById('importCard').style.display = isMaintainer() ? 'block' : 'none';
+  fillSettingsForm();
+  document.getElementById('settingShopName').disabled = !isStoreAdmin();
+  document.getElementById('settingAppSub').disabled = !isStoreAdmin();
+  document.getElementById('faviconUpload').disabled = !isStoreAdmin();
+  document.getElementById('bgUpload').disabled = !isMaintainer();
+  document.getElementById('bgPatternRow').style.opacity = isMaintainer() ? '1' : '.5';
+  if(db.settings.bgPattern){
+    const bp = document.getElementById('bgPreview');
+    bp.src = db.settings.bgPattern; bp.style.display='inline-block';
+  }
+  const wrap = document.getElementById('adminSupplierList');
+  if(!isStoreAdmin()){
+    wrap.innerHTML = `<div class="log-row">供應商管理僅「管理者」以上身份可查看與操作</div>`;
+  } else {
+    wrap.innerHTML = db.suppliers.map(s=>{
+      const itemCount = db.items.filter(i=>i.supplierId===s.id).length;
+      return `<div class="supplier-manage-item">
+        <span>${escapeHtml(s.name)} <span style="color:var(--gray);font-size:11px;">（${itemCount}項・叫貨${s.freq||0}次）</span></span>
+        <span class="del-x" onclick="deleteSupplier('${s.id}')">刪除</span>
+      </div>`;
+    }).join('') || '<div class="empty">尚無供應商</div>';
+  }
+
+  renderItemManage();
+
+  const logWrap = document.getElementById('priceLog');
+  if(db.priceLog.length===0){ logWrap.innerHTML='<div class="empty">尚無單價異動紀錄</div>'; return; }
+  logWrap.innerHTML = db.priceLog.slice(0,30).map(l=>`
+    <div class="log-row"><b>${escapeHtml(l.itemName)}</b>　NTD ${l.old} → NTD ${l.next}
+      <br>${l.time}・操作角色：${escapeHtml(l.role)}</div>`).join('');
+}
+function renderItemManage(){
+  const sel = document.getElementById('itemManageSupplierSelect');
+  const wrap = document.getElementById('itemManageList');
+  if(!sel || !wrap) return;
+  const addRow = document.getElementById('itemManageAddRow');
+  if(addRow) addRow.style.display = isStoreAdmin() ? 'flex' : 'none';
+  const curVal = sel.value;
+  sel.innerHTML = db.suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  if(curVal && db.suppliers.some(s=>s.id===curVal)) sel.value = curVal;
+  const sid = sel.value;
+  if(!sid){ wrap.innerHTML=''; return; }
+  const items = sortedItemsForSupplier(sid);
+  if(items.length===0){ wrap.innerHTML = '<div class="empty">這家供應商還沒有品項</div>'; return; }
+  wrap.innerHTML = `<div class="card">` + items.map((it,idx)=>`
+    <div class="supplier-manage-item" style="flex-wrap:wrap;gap:8px;">
+      <div style="flex:1;min-width:150px;">
+        <div style="font-weight:600;">${escapeHtml(it.name)}</div>
+        <div style="display:flex;gap:6px;margin-top:6px;align-items:center;">
+          <span style="font-size:12px;color:var(--gray);">規格/單位</span>
+          <input type="text" value="${escapeHtml(it.unit)}" style="width:90px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
+            onchange="updateItemUnit('${it.id}', this.value)">
+          <span style="font-size:12px;color:var(--gray);">單價</span>
+          <input type="number" value="${it.price}" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
+            onchange="updateItemPrice('${it.id}', this.value)">
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+        <button class="icon-btn" style="padding:6px 10px;" ${!isStoreAdmin()||idx===0?'disabled':''} onclick="moveItem('${it.id}',-1)">▲</button>
+        <button class="icon-btn" style="padding:6px 10px;" ${!isStoreAdmin()||idx===items.length-1?'disabled':''} onclick="moveItem('${it.id}',1)">▼</button>
+        ${isStoreAdmin()?`<span class="del-x" onclick="deleteItem('${it.id}')">刪除</span>`:''}
+      </div>
+    </div>`).join('') + `</div>`;
+}
+function deleteSupplier(id){
+  if(!isStoreAdmin()) return;
+  const deletedSupplier = db.suppliers.find(s=>s.id===id);
+  if(!deletedSupplier) return;
+  // 2026-10-02新增：刪供應商原本也是「點了就刪、沒有二次確認」，而且會連同
+  // 底下所有品項一起刪掉——風險比刪單一品項更高，更需要說清楚會影響多少品項。
+  const itemCountUnderSupplier = db.items.filter(i=>i.supplierId===id).length;
+  const okDel = window.confirm(`確定要刪除這家供應商嗎？此動作無法復原。\n\n供應商：${deletedSupplier.name}\n連同底下 ${itemCountUnderSupplier} 個品項會一併刪除`);
+  if(!okDel) return;
+  const deletedAt = nowISO();
+  db.suppliers = db.suppliers.filter(s=>s.id!==id);
+  db.deletedSupplierIds.push({id, deletedAt}); // 記錄刪除時間，多裝置合併同步時才不會被舊裝置復活
+  const removedItemIds = db.items.filter(i=>i.supplierId===id).map(i=>i.id);
+  db.items = db.items.filter(i=>i.supplierId!==id);
+  removedItemIds.forEach(itemId=>{ db.deletedItemIds.push({id:itemId, deletedAt}); }); // 供應商底下的品項也一併記錄刪除，不然合併時會被復活
+  delete db.cart[id];
+  touchCartSupplier_(id);
+  if(deletedSupplier) logAction('刪除供應商', deletedSupplier.name, `連同${removedItemIds.length}個品項一併刪除`);
+  saveDB(); renderAdmin(); renderSupplierList();
+  showToast('已刪除供應商');
+}
+// 2026-10-01新增：管理員刪除訂單（用於清掉測試單、誤建單等情境）。
+// 限制只有維護專員／管理者能刪，刪除前跳出確認視窗避免手滑誤刪。
+// 用墓碑機制（deletedOrderIds）記錄，確保多裝置同步時不會被舊裝置的資料復活，
+// 刪除動作本身也會記進操作紀錄（db.actionLog），存到後台試算表留痕可追溯。
+function deleteOrder(orderId){
+  if(!isStoreAdmin()){ showToast('只有維護專員／管理者能刪除訂單'); return; }
+  const o = db.orders.find(x=>x.id===orderId);
+  if(!o) return;
+  const statusLabel = o.status==='done' ? '已完成收貨' : '尚未收貨';
+  const ok = window.confirm(`確定要刪除這張訂單嗎？此動作無法復原。\n\n訂單編號：${o.id}\n供應商：${o.supplierName}\n狀態：${statusLabel}`);
+  if(!ok) return;
+  db.orders = db.orders.filter(x=>x.id!==orderId);
+  db.deletedOrderIds.push({id:orderId, deletedAt:nowISO()});
+  logAction('刪除訂單', o.supplierName, `訂單編號：${o.id}（${statusLabel}）`);
+  saveDB(); renderReceive();
+  showToast('已刪除訂單');
+}
+
+/* ---------- 匯入完整供應商名單（客戶提供的彙整檔） ---------- */
+function importFullSupplierList(){
+  if(!isMaintainer()){ showToast('只有維護專員能匯入名單'); return; }
+  let addedSuppliers = 0, addedItems = 0, skippedItems = 0;
+  FULL_SUPPLIER_IMPORT.forEach(group=>{
+    let supplier = db.suppliers.find(s=>s.name===group.name);
+    if(!supplier){
+      supplier = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name:group.name, freq:0, updatedAt:nowISO()};
+      db.suppliers.push(supplier);
+      addedSuppliers++;
+    }
+    let nextIdx = nextSortIndex(supplier.id);
+    group.items.forEach(it=>{
+      const exists = db.items.some(x=>x.supplierId===supplier.id && x.name===it.name);
+      if(exists){ skippedItems++; return; }
+      db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*10000), supplierId:supplier.id,
+        code:'', name:it.name, unit:it.unit, price:money(it.price), updatedAt:nowISO(), sortIndex:nextIdx++});
+      addedItems++;
+    });
+  });
+  saveDB();
+  renderAdmin(); renderSupplierList();
+  showToast(`匯入完成：新增${addedSuppliers}家供應商、${addedItems}項品項（略過${skippedItems}項重複）`);
+}
+
+/* ---------- 帳號管理（僅維護專員） ---------- */
+function renderAccountManage(){
+  const wrap = document.getElementById('accountManageList');
+  const formWrap = document.getElementById('accountAddForm');
+  if(!isMaintainer()){
+    wrap.innerHTML = `<div class="log-row">帳號管理僅「維護專員」身份可查看與操作</div>`;
+    formWrap.style.display = 'none';
+    return;
+  }
+  formWrap.style.display = 'block';
+  const roleSel = document.getElementById('newAccRole');
+  if(roleSel && roleSel.options.length===0){
+    roleSel.innerHTML = ROLES.map(r=>`<option value="${r}">${r}</option>`).join('');
+  }
+  wrap.innerHTML = db.accounts.map(a=>`
+    <div class="supplier-manage-item">
+      <span>${escapeHtml(a.name)}（${escapeHtml(a.role)}）<br>
+        <span style="color:var(--gray);font-size:12px;">帳號：${escapeHtml(a.account)}／密碼：••••
+          <a style="color:var(--brand);cursor:pointer;margin-left:4px;" onclick="resetAccountPassword('${a.id}')">重設</a>
+        </span></span>
+      <span class="del-x" onclick="deleteAccount('${a.id}')">刪除</span>
+    </div>`).join('') || '<div class="empty">尚無帳號</div>';
+}
+// 2026-10-02變更：密碼改成雜湊存放之後，系統本身也沒辦法再「顯示」原密碼是什麼
+// （這是雜湊的本質，不是忘記做，加密過的密碼無法反推回明文）——原本點一下
+// 就能看到密碼的功能，改成「重設」：直接幫這個帳號設一組新密碼。
+async function resetAccountPassword(id){
+  if(!isMaintainer()) return;
+  const a = db.accounts.find(x=>x.id===id);
+  if(!a) return;
+  const newPw = prompt(`幫「${a.name}（${a.account}）」設定新密碼：`);
+  if(!newPw || !newPw.trim()) return;
+  a.password = await hashPassword_(newPw.trim());
+  logAction('重設密碼', a.account, `幫 ${a.name} 重設密碼`);
+  saveDB(); renderAccountManage();
+  showToast('已重設密碼，請告知對方新密碼');
+}
+async function addAccount(){
+  if(!isMaintainer()) return;
+  const account = document.getElementById('newAccAccount').value.trim();
+  const password = document.getElementById('newAccPassword').value.trim();
+  const name = document.getElementById('newAccName').value.trim();
+  const role = document.getElementById('newAccRole').value;
+  if(!account || !password || !name){ showToast('帳號、密碼、姓名都要填'); return; }
+  if(db.accounts.some(a=>a.account.toLowerCase()===account.toLowerCase())){ showToast('這個帳號已經存在了（帳號不分大小寫）'); return; }
+  const hashed = await hashPassword_(password);
+  db.accounts.push({id:'u'+Date.now()+Math.floor(Math.random()*1000), account, password:hashed, role, name});
+  document.getElementById('newAccAccount').value='';
+  document.getElementById('newAccPassword').value='';
+  document.getElementById('newAccName').value='';
+  saveDB(); renderAccountManage();
+  showToast('已新增帳號');
+}
+function deleteAccount(id){
+  if(!isMaintainer()) return;
+  if(currentAccount && currentAccount.id===id){ showToast('不能刪除目前登入中的帳號'); return; }
+  if(db.accounts.length<=1){ showToast('至少要保留一個帳號'); return; }
+  db.accounts = db.accounts.filter(a=>a.id!==id);
+  saveDB(); renderAccountManage();
+  showToast('已刪除帳號');
+}
+
+/* ---------- 小工具 ---------- */
+function escapeHtml(str){
+  return String(str??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+let toastTimer;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+// 2026-10-20：背景同步完成後會呼叫renderAll()把畫面換成最新資料。10/20事故：收貨填到一半、
+// 下單打數量打到一半，畫面被整個換掉，打的數字全部不見。現在：
+//  - 店員正在輸入（游標在輸入框裡）→ 先不刷新，等離開輸入框再補刷新（資料本身照常即時合併，只延後畫面）
+//  - 收貨明細（或臨時追加畫面）打開中 → 不換掉這個畫面，返回列表時才刷新
+let renderAllDeferred_ = false;
+function isUserTyping_(){
+  const ae = document.activeElement;
+  return !!(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT') && !ae.closest('#loginGate') && !ae.closest('#tokenModal'));
+}
+document.addEventListener('focusout', function(){
+  if(!renderAllDeferred_) return;
+  setTimeout(()=>{ if(renderAllDeferred_ && !isUserTyping_() && currentAccount){ renderAllDeferred_ = false; renderAll(); } }, 250);
+});
+function renderAll(){
+  if(isUserTyping_()){ renderAllDeferred_ = true; renderSupplierListSafe_(); updateCheckoutBar(); renderPendingShareBar_(); return; }
+  renderAllDeferred_ = false;
+  renderSupplierList();
+  renderPendingShareBar_();
+  if(document.getElementById('page-items').classList.contains('active')) renderItemList();
+  if(state.activeTab==='receive' && !state.receiveDetailId) renderReceive();
+  if(state.activeTab==='stock') renderStock();
+  if(state.activeTab==='admin') renderAdmin();
+  updateCheckoutBar();
+}
+
+/* ---------- 資料修正：韓濟名味品拆分酒水／食材（只會執行一次，之後自動略過）---------- */
+function migrateHanjiSplit(){
+  const old = db.suppliers.find(s=>s.name==='韓濟名味品有限公司');
+  if(!old) return; // 沒有舊的合併供應商，代表已經拆過或本來就沒有，不用處理
+  const liquorGroup = FULL_SUPPLIER_IMPORT.find(g=>g.name==='韓濟名味品有限公司-酒水');
+  const liquorNames = new Set((liquorGroup?liquorGroup.items:[]).map(i=>i.name));
+  function ensureSupplier(name){
+    let s = db.suppliers.find(x=>x.name===name);
+    if(!s){ s = {id:'s'+Date.now()+Math.floor(Math.random()*1000), name, freq:0, updatedAt:nowISO()}; db.suppliers.push(s); }
+    return s;
+  }
+  const liquorSup = ensureSupplier('韓濟名味品有限公司-酒水');
+  const foodSup = ensureSupplier('韓濟名味品有限公司-食材');
+  let nextLiquorIdx = nextSortIndex(liquorSup.id), nextFoodIdx = nextSortIndex(foodSup.id);
+  db.items.forEach(it=>{
+    if(it.supplierId===old.id){
+      const toLiquor = liquorNames.has(it.name);
+      it.supplierId = toLiquor ? liquorSup.id : foodSup.id;
+      it.sortIndex = toLiquor ? nextLiquorIdx++ : nextFoodIdx++;
+      it.updatedAt = nowISO();
+    }
+  });
+  liquorSup.freq = (liquorSup.freq||0) + Math.round((old.freq||0)/2);
+  foodSup.freq = (foodSup.freq||0) + Math.round((old.freq||0)/2);
+  liquorSup.updatedAt = nowISO(); foodSup.updatedAt = nowISO();
+  if(db.cart[old.id]){
+    Object.keys(db.cart[old.id]).forEach(itemId=>{
+      const it = db.items.find(x=>x.id===itemId);
+      if(!it) return;
+      if(!db.cart[it.supplierId]) db.cart[it.supplierId]={};
+      db.cart[it.supplierId][itemId] = db.cart[old.id][itemId];
+      touchCartSupplier_(it.supplierId);
+    });
+    delete db.cart[old.id];
+    touchCartSupplier_(old.id);
+  }
+  db.suppliers = db.suppliers.filter(s=>s.id!==old.id);
+  db.deletedSupplierIds.push({id:old.id, deletedAt:nowISO()});
+  saveDB();
+}
+
+/* ---------- 角色精簡：舊角色名稱自動對應到新角色（只會執行一次，之後自動略過）---------- */
+function migrateRoles(){
+  let changed = false;
+  (db.accounts||[]).forEach(a=>{
+    if(LEGACY_ROLE_MAP[a.role]){ a.role = LEGACY_ROLE_MAP[a.role]; changed = true; }
+  });
+  if(changed) saveDB();
+}
+
+/* ---------- 防呆：合併同名供應商 ----------
+   兩台裝置同時第一次載入、同時觸發 migrateHanjiSplit() 的極端情況下，
+   有可能各自建立一份「韓濟名味品有限公司-食材/酒水」並各自推上雲端，
+   造成同名供應商重複。這裡在每次啟動時掃一次，若真的出現同名，
+   自動把品項/購物車/上次叫貨紀錄併到先出現的那筆，並移除多餘的重複，
+   避免看到兩個一樣名字的供應商或品項憑空消失。 */
+function mergeDuplicateSuppliers(){
+  const byName = {};
+  let changed = false;
+  db.suppliers.forEach(s=>{
+    const keep = byName[s.name];
+    if(keep){
+      db.items.forEach(it=>{ if(it.supplierId===s.id){ it.supplierId = keep.id; it.updatedAt = nowISO(); } });
+      if(db.cart[s.id]){
+        db.cart[keep.id] = db.cart[keep.id] || {};
+        Object.keys(db.cart[s.id]).forEach(itemId=>{
+          db.cart[keep.id][itemId] = (db.cart[keep.id][itemId]||0) + db.cart[s.id][itemId];
+        });
+        delete db.cart[s.id];
+        touchCartSupplier_(s.id);
+        touchCartSupplier_(keep.id);
+      }
+      if(db.lastOrderBySupplier && db.lastOrderBySupplier[s.id]){
+        if(!db.lastOrderBySupplier[keep.id]) db.lastOrderBySupplier[keep.id] = db.lastOrderBySupplier[s.id];
+        delete db.lastOrderBySupplier[s.id];
+      }
+      keep.freq = (keep.freq||0) + (s.freq||0);
+      keep.updatedAt = nowISO();
+      s._dupMarked = true;
+      db.deletedSupplierIds.push({id:s.id, deletedAt:nowISO()}); // 同名合併掉的供應商也要記墓碑，不然被舊裝置合併同步時會復活
+      changed = true;
+    } else {
+      byName[s.name] = s;
+    }
+  });
+  if(changed){
+    db.suppliers = db.suppliers.filter(s=>!s._dupMarked);
+    saveDB();
+  }
+}
+
+/* ---------- 手機鍵盤把輸入框擋住/跳出畫面的修正 ----------
+   手機瀏覽器跳出數字鍵盤時，畫面下方固定的「結帳列」「底部導覽列」
+   有時候會蓋住或把正在輸入的欄位擠出可視範圍，導致「點進去有時候會跳出來」。
+   用事件委派監聽全站所有欄位，鍵盤動畫跑完後（約0.3秒）自動把該欄位
+   捲動到畫面看得到、打得到字的位置。*/
+document.addEventListener('focusin', function(e){
+  const el = e.target;
+  if(el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT'){
+    clearTimeout(window._scrollFixTimer);
+    window._scrollFixTimer = setTimeout(()=>{
+      el.scrollIntoView({block:'center', behavior:'smooth'});
+    }, 300);
+  }
+});
+
+/* ---------- 初始化 ---------- */
+async function initApp(){
+  applySettings();
+  updatePendingSyncBanner_(); // App一開啟就先檢查一次：如果上次關閉時還有沒送出去的訂單，立刻顯示警示，不用等第一次setSyncStatus()被呼叫
+  if(getGasUrl()){
+    // 2026-10-20：代碼只在這裡（開門、登入之前）問。已綁定的裝置完全不問。
+    await ensureAccessTokenAtEntry_();
+    await pullFromCloud(false); // 等雲端資料真的到齊，登入驗證才會用到最新帳號清單
+    if(lastPullNeedAuth_ && (await verifyTokenRaw_(getAccessToken_())) === 'bad'){
+      // 開門時才發現這台裝置記住的代碼已經失效（例如店長換了代碼）→ 這時候還在門口，問一次是合理的
+      setAccessToken_('');
+      await promptTokenAtEntry_(false);
+      await pullFromCloud(false);
+    }
+  } else {
+    setSyncStatus('offline');
+  }
+  migrateHanjiSplit();
+  migrateRoles();
+  mergeDuplicateSuppliers();
+  const hint = document.getElementById('loginLoadingHint');
+  if(hint) hint.style.display = 'none';
+  initLogin(); // 登入成功後（loginAsAccount內）才會渲染供應商/訂單等業務資料
+  renderLicenseBanner();
+  renderLicenseGate();
+}
+initApp();
+
+/* ---------- 2026-10-28 新版本提示 ----------
+   10/28 事故：店員手機一直開著更新前的舊畫面，送出後等不到確認、出不了 LINE 清單。
+   現在：每5分鐘、以及從別的App切回來時，自己檢查網站上的版本；有新版就在狀態列出現
+   「有新版本，點這裡更新」小按鈕，不跳視窗、不打斷，店員方便時點一下。
+   更新前會先試著把手機上還沒送出的資料送出；資料本來就存在手機，重新整理也不會不見。 */
+let newVersionAvailable_ = '';
+async function checkForNewVersion_(){
+  try{
+    const base = location.href.split('#')[0].split('?')[0];
+    const t = await fetch(base + '?vcheck=' + Date.now(), {cache:'no-store'}).then(r=>r.ok ? r.text() : '');
+    const m = t && t.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1] && m[1] !== APP_VERSION){ newVersionAvailable_ = m[1]; }
+  }catch(e){}
+  renderUpdatePill_();
+}
+function renderUpdatePill_(){
+  const p = document.getElementById('updatePill');
+  if(p) p.classList.toggle('show', !!newVersionAvailable_);
+}
+async function applyUpdate_(){
+  const p = document.getElementById('updatePill');
+  if(p){ p.disabled = true; p.textContent = '更新中，請稍候…'; }
+  let pending = false;
+  try{ pending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  if(pending && getGasUrl() && !cloudPushInFlight){
+    try{ await Promise.race([ pushOnce_(), new Promise(r=>setTimeout(r, 12000)) ]); }catch(e){}
+  }
+  location.replace(location.href.split('#')[0].split('?')[0] + '?v=' + encodeURIComponent(newVersionAvailable_ || Date.now()));
+}
+setInterval(checkForNewVersion_, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkForNewVersion_(); });
+setTimeout(checkForNewVersion_, 20000);
+
+/* ---------- 背景定期同步（縮短資料落後的時間窗，降低舊裝置蓋掉新資料的風險） ---------- */
+setInterval(()=>{
+  if(!currentAccount) return;           // 還沒登入，不需要背景同步
+  if(cloudSyncTimer) return;            // 本機正有變更排隊要送出，避免搶跑
+  if(cloudPushInFlight) return;         // 本機有一次push還在送出中（尚未完成），避免這時候pull把還沒送出的資料蓋掉
+  if(!getGasUrl()) return;              // 沒設定雲端網址就不用同步
+  const ae = document.activeElement;
+  if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.tagName==='SELECT')) return; // 使用者正在輸入，先不要打斷
+  pullFromCloud(false);
+}, 3*60*1000);
+
+/* ---------- 離開頁面防呆 ---------- */
+// 2026-10-01新增：Barbara的要求是「客戶端修改後，跟送上雲端這件事，連結度要順暢」——
+// 這份系統目前的架構（品項/供應商/訂單/設定...任何異動都先存本機、雲端同步在背景做）
+// 對「資料不會不見」已經有保護（PENDING_SYNC_KEY機制，下次打開會自動補送），但如果
+// 使用者在送出去之前就主動關掉分頁/重新整理，畫面上原本沒有明確警告。
+// 這裡加一個瀏覽器原生的「確定要離開嗎」提示：只要還有本機異動還沒確認送達雲端
+// （PENDING_SYNC_KEY還在），使用者想關閉分頁/重新整理/跳轉到別的網址，瀏覽器會
+// 跳出標準警告視窗，要使用者自己確認才能真的離開——這就是「上傳確認後才能確定
+// 離開頁面」的具體做法。
+// 誠實的限制：手機瀏覽器「切到別的App」（例如切去LINE分享）不一定會觸發這個事件
+// （這是手機作業系統的行為，網頁程式無法強制攔截），所以這個提示補的是「使用者
+// 自己主動關閉/切換網址」這種情況；「切到別的App」那種情況，資料安全是靠
+// PENDING_SYNC_KEY機制本身保護（下次打開會自動偵測、合併、補送，不會不見），
+// 兩者合起來才是完整的保護，不是互相替代。
+window.addEventListener('beforeunload', function(e){
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(err){}
+  if(hasPending){
+    e.preventDefault();
+    e.returnValue = '還有異動尚未確認送達雲端，確定要離開嗎？';
+    return e.returnValue;
+  }
+});
+// 2026-10-02新增：「切到LINE分享訂單」這個動作本身無法攔截（見上面的誠實限制說明），
+// 但「切回來」是攔得到的——分頁從背景切回前景時觸發visibilitychange，這裡立刻主動
+// 檢查一次有沒有還沒送出去的異動，有的話馬上重試，不用乾等最長3分鐘的背景定期同步，
+// 把「下單→切LINE分享→切回來」這個最容易漏單的流程缺口補起來。
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState !== 'visible') return;
+  if(!currentAccount) return;
+  let hasPending = false;
+  try{ hasPending = localStorage.getItem(PENDING_SYNC_KEY) === '1'; }catch(e){}
+  if(hasPending && getGasUrl() && !cloudPushInFlight){
+    pullFromCloud(false); // 內部會判斷hasPendingLocalChanges並自動補送，邏輯共用
+  }
+});
+</script>
+</body>
+</html>
