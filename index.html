@@ -453,7 +453,7 @@ input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;bord
   <div id="itemList"></div>
   <div class="add-supplier-row" id="addItemRow">
     <input type="text" id="newItemName" placeholder="新增品項名稱…">
-    <input type="text" id="newItemPrice" placeholder="單價" style="max-width:70px;">
+    <input type="text" inputmode="decimal" id="newItemPrice" placeholder="單價" style="max-width:70px;">
     <button class="icon-btn" onclick="addItem()">＋新增</button>
   </div>
 </section>
@@ -594,7 +594,7 @@ input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;bord
       </div>
       <div class="add-supplier-row" id="itemManageAddRow">
         <input type="text" id="itemManageNewName" placeholder="新增品項名稱…">
-        <input type="text" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
+        <input type="text" inputmode="decimal" id="itemManageNewPrice" placeholder="單價" style="max-width:70px;">
         <button class="icon-btn" onclick="addItemFromManage()">＋新增</button>
       </div>
       <div id="itemManageList"></div>
@@ -953,6 +953,7 @@ const FULL_SUPPLIER_IMPORT = [
 
 /* 金額一律四捨五入成整數：建立/編輯單價、驗收加總都套用這個 */
 function money(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n); }
+function price2(n){ n = Number(n); return isNaN(n) ? 0 : Math.round(n*100)/100; } // 單價：保留到小數第 2 位（例 0.33）
 
 const DB_KEY = 'kklz_order_system_v1';
 const GAS_URL_KEY = 'kklz_gas_url';
@@ -1019,7 +1020,7 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
-const APP_VERSION = '2026.10.28-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+const APP_VERSION = '2026.10.30-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
 document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
 // ===== 2026-10-14新增：雲端存取代碼 =====
@@ -2182,7 +2183,7 @@ function renderItemList(){
       <div class="item-info">
         <div class="item-code">${escapeHtml(it.code||'')}</div>
         <div class="item-name">${escapeHtml(it.name)}</div>
-        <div class="item-price-row">單價 NTD <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'}
+        <div class="item-price-row">單價 NTD <input type="number" step="any" inputmode="decimal" value="${it.price}" ${isStoreAdmin()?'':'disabled'}
           onchange="updateItemPrice('${it.id}', this.value)"> / <input type="text" value="${escapeHtml(it.unit)}" ${isStoreAdmin()?'':'disabled'}
           style="width:70px;text-align:left;" onchange="updateItemUnit('${it.id}', this.value)">
           ${isStoreAdmin()?`<span class="del-x" style="padding:2px 8px;font-size:12px;" onclick="deleteItem('${it.id}')">刪除</span>`:''}
@@ -2227,7 +2228,7 @@ function setQtyDirect(sid, itemId, val){
 function updateItemPrice(itemId, val){
   if(!isStoreAdmin()) return;
   const raw = parseFloat(val); if(isNaN(raw)) return;
-  const p = money(raw);
+  const p = price2(raw);
   const item = db.items.find(i=>i.id===itemId);
   if(!item || item.price===p) return;
   const old = item.price;
@@ -2288,7 +2289,7 @@ function moveItem(itemId, dir){
 function addItem(){
   if(!isStoreAdmin()) return;
   const name = document.getElementById('newItemName').value.trim();
-  const price = money(parseFloat(document.getElementById('newItemPrice').value)||0);
+  const price = price2(parseFloat(document.getElementById('newItemPrice').value)||0);
   if(!name) return;
   db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:state.currentSupplierId, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(state.currentSupplierId)});
   document.getElementById('newItemName').value='';
@@ -2305,7 +2306,7 @@ function addItemFromManage(){
   const sid = document.getElementById('itemManageSupplierSelect').value;
   if(!sid){ showToast('請先選擇供應商'); return; }
   const name = document.getElementById('itemManageNewName').value.trim();
-  const price = money(parseFloat(document.getElementById('itemManageNewPrice').value)||0);
+  const price = price2(parseFloat(document.getElementById('itemManageNewPrice').value)||0);
   if(!name) return;
   db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*1000), supplierId:sid, code:'', name, unit:'份', price, updatedAt:nowISO(), sortIndex:nextSortIndex(sid)});
   document.getElementById('itemManageNewName').value='';
@@ -3107,7 +3108,7 @@ function confirmReceive(orderId, opts){
     const qEl = fieldEl(idx,'qty'), pEl = fieldEl(idx,'price');
     // 畫面上找不到這一格（例如填寫期間別台裝置追加了品項）→ 用訂購數量／單價，不讓整個收貨失敗
     const actualQty = qEl ? (parseFloat(qEl.value)||0) : it.qty;
-    const actualPrice = pEl ? money(parseFloat(pEl.value)||0) : it.price;
+    const actualPrice = pEl ? price2(parseFloat(pEl.value)||0) : it.price;
     received.push({name:it.name, orderedQty:it.qty, actualQty, orderedPrice:it.price, actualPrice,
       diff: (actualQty!==it.qty || actualPrice!==it.price)});
   });
@@ -3238,9 +3239,9 @@ function buildPurchaseStats_(){
 function avgPriceFor_(item, month, stats){
   const byM = stats[item.id] || {};
   const cur = byM[month];
-  if(cur && cur.qty > 0) return {price: money(cur.amt/cur.qty), src:'month'};
+  if(cur && cur.qty > 0) return {price: price2(cur.amt/cur.qty), src:'month'};
   const earlier = Object.keys(byM).filter(k=>k < month && byM[k].qty > 0).sort();
-  if(earlier.length){ const k = earlier[earlier.length-1]; return {price: money(byM[k].amt/byM[k].qty), src:'prev', from:k}; }
+  if(earlier.length){ const k = earlier[earlier.length-1]; return {price: price2(byM[k].amt/byM[k].qty), src:'prev', from:k}; }
   const p = Number(item.price)||0;
   return p > 0 ? {price:p, src:'item'} : {price:0, src:'none'};
 }
@@ -3291,7 +3292,7 @@ function renderStock(){
       <div class="meta">${escapeHtml(it.code||'—')} · ${escapeHtml(s?.name||'')}</div></div></div>
       <div class="grid2">
         <div class="mini-field"><label>單價 NTD／${escapeHtml(it.unit)}</label>
-          <input type="number" value="${it.price}" ${isStoreAdmin()?'':'disabled'} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
+          <input type="number" step="any" inputmode="decimal" value="${it.price}" ${isStoreAdmin()?'':'disabled'} onchange="updateItemPrice('${it.id}', this.value); showSaved('${it.id}')"></div>
         <div class="mini-field"><label>${Number(month.slice(5))}月結餘（盤點數量）</label>
           <input type="number" step="any" value="${q||''}" placeholder="0" ${isReadonly()?'disabled':''} onchange="updateStockQty('${it.id}', this.value); showSaved('${it.id}')"></div>
       </div>
@@ -3517,7 +3518,7 @@ function renderItemManage(){
           <input type="text" value="${escapeHtml(it.unit)}" style="width:90px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
             onchange="updateItemUnit('${it.id}', this.value)">
           <span style="font-size:12px;color:var(--gray);">單價</span>
-          <input type="number" value="${it.price}" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
+          <input type="number" step="any" inputmode="decimal" value="${it.price}" style="width:70px;border:1px solid var(--line);border-radius:6px;padding:5px 6px;font-size:13px;" ${isStoreAdmin()?'':'disabled'}
             onchange="updateItemPrice('${it.id}', this.value)">
         </div>
       </div>
@@ -3583,7 +3584,7 @@ function importFullSupplierList(){
       const exists = db.items.some(x=>x.supplierId===supplier.id && x.name===it.name);
       if(exists){ skippedItems++; return; }
       db.items.push({id:'i'+Date.now()+Math.floor(Math.random()*10000), supplierId:supplier.id,
-        code:'', name:it.name, unit:it.unit, price:money(it.price), updatedAt:nowISO(), sortIndex:nextIdx++});
+        code:'', name:it.name, unit:it.unit, price:price2(it.price), updatedAt:nowISO(), sortIndex:nextIdx++});
       addedItems++;
     });
   });
