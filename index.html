@@ -376,6 +376,10 @@ input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;bord
 .status-pill{border-radius:999px;}
 .status-sent{background:var(--gold-soft);color:#7A5A22;}
 .recv-tap{display:inline-block;float:right;background:var(--charcoal);color:#fff;border-radius:999px;padding:8px 16px;font-size:14px;}
+.order-card .row1{gap:10px;align-items:flex-start;}
+.order-card .row1 > div:first-child{min-width:0;flex:1 1 auto;}
+.order-card .status-pill{white-space:nowrap;flex-shrink:0;}
+.order-card .recv-tap{display:block;float:none;width:fit-content;margin:12px 0 0 auto;}
 /* 結帳列：懸浮深炭膠囊 */
 .checkout-bar{left:12px;right:12px;bottom:96px;border-radius:24px;background:linear-gradient(145deg,#2A201C,#17100E);box-shadow:var(--lift-lg);border:none;}
 .checkout-bar button{border-radius:999px;background:var(--brand);box-shadow:var(--ember-glow);}
@@ -1020,7 +1024,7 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
-const APP_VERSION = '2026.10.30-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+const APP_VERSION = '2026.11.05-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
 document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
 // ===== 2026-10-14新增：雲端存取代碼 =====
