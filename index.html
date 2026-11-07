@@ -232,6 +232,7 @@ body.readonly .readonly-badge{display:inline-block;}
 /* 2026-10-28：盤存總金額 */
 .stock-month-row{display:flex;align-items:center;gap:10px;margin:0 0 12px;}
 .stock-month-row label{font-size:14px;color:var(--gray);font-weight:600;}
+.stock-month-hint{font-size:13px;color:#7A5A22;background:var(--gold-soft);border-radius:999px;padding:7px 14px;margin:-4px 0 12px;font-weight:600;}
 .stock-month-row input{flex:1;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font-size:16px;background:var(--card);}
 .stock-summary{background:linear-gradient(145deg,#2A201C,#17100E);color:#FBF3E8;border-radius:22px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 4px rgba(40,25,18,.06),0 16px 32px -10px rgba(40,25,18,.22);}
 .stock-summary .ss-label{font-size:14px;color:#D9CBBE;letter-spacing:.06em;}
@@ -508,6 +509,8 @@ input:focus{outline:none;box-shadow:0 0 0 3px rgba(192,57,31,.16)!important;bord
 <section class="page" id="page-stock">
   <div class="page-title">庫存盤點 <span class="cnt">改完自動儲存，不用另外按存檔</span></div>
   <div class="stock-month-row"><label for="stockMonth">盤點月份</label><input type="month" id="stockMonth" onchange="setStockMonth_(this.value)"></div>
+  <div class="stock-month-hint" id="stockMonthHint"></div>
+  <button class="icon-btn" style="width:100%;margin-bottom:12px;" onclick="exportStockCsv_()">📥 匯出盤點報表（Excel 可開啟）</button>
   <div id="stockSummary"></div>
   <div class="stock-filter" id="stockFilter"></div>
   <div id="stockList"></div>
@@ -1024,7 +1027,7 @@ let db = loadDB();
 let state = { currentSupplierId:null, activeTab:'order', itemViewMode:'list' };
 let cloudSyncTimer = null;
 
-const APP_VERSION = '2026.11.05-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
+const APP_VERSION = '2026.11.07-a'; // 前端版本號：每次更新請同步改這裡，出問題時店家可以回報畫面上的版本
 document.addEventListener('DOMContentLoaded',()=>{ const v=document.getElementById('verText'); if(v) v.textContent='v'+APP_VERSION; });
 const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxYD6eazKvfp4GffLS2SNwtSuRBhhoS0DUXBt5to6rne6JhYSGzlCiiRZjDbng2oRSMRg/exec';
 // ===== 2026-10-14新增：雲端存取代碼 =====
@@ -3255,12 +3258,22 @@ function stockQtyFor_(item, month){
   if(month === monthKeyNow_()) return Number(item.stockQty)||0;
   return 0;
 }
-function setStockMonth_(v){ state.stockMonth = v || monthKeyNow_(); renderStock(); }
+// 月初前5天補輸入的多半是上個月的盤點，所以預設顯示上個月；其他日子預設本月。隨時可用上方月份切換
+function stockDefaultMonth_(){
+  const d = new Date();
+  if(d.getDate() <= 5){ const p = new Date(d.getFullYear(), d.getMonth()-1, 1); return p.getFullYear()+'-'+String(p.getMonth()+1).padStart(2,'0'); }
+  return monthKeyNow_();
+}
+function setStockMonth_(v){ state.stockMonth = v || stockDefaultMonth_(); renderStock(); }
 function renderStock(){
-  if(!state.stockMonth) state.stockMonth = monthKeyNow_();
+  if(!state.stockMonth) state.stockMonth = stockDefaultMonth_();
   const month = state.stockMonth;
   const monthInput = document.getElementById('stockMonth');
   if(monthInput){ monthInput.value = month; monthInput.max = monthKeyNow_(); }
+  const hintEl = document.getElementById('stockMonthHint');
+  if(hintEl){ const hm = month.split('-'); hintEl.textContent = month === monthKeyNow_()
+    ? `目前輸入 ${hm[0]}年${Number(hm[1])}月（本月）盤點`
+    : `目前輸入 ${hm[0]}年${Number(hm[1])}月盤點，要輸入本月請切換上方月份`; }
   const filterWrap = document.getElementById('stockFilter');
   filterWrap.innerHTML = `<button class="${stockFilterSupplier==='all'?'on':''}" onclick="setStockFilter('all')">全部</button>` +
     db.suppliers.map(s=>`<button class="${stockFilterSupplier===s.id?'on':''}" onclick="setStockFilter('${s.id}')">${escapeHtml(s.name)}</button>`).join('');
@@ -3324,7 +3337,7 @@ function updateStockQty(itemId, val){
   if(isReadonly()) return; // 唯讀身份不可修改盤點數量（欄位已disabled，這裡再擋一次避免被繞過）
   const item = db.items.find(i=>i.id===itemId);
   if(!item) return;
-  const month = state.stockMonth || monthKeyNow_();
+  const month = state.stockMonth || stockDefaultMonth_();
   const q = parseFloat(val)||0;
   if(!item.stockByMonth || typeof item.stockByMonth!=='object') item.stockByMonth = {};
   item.stockByMonth[month] = q;
@@ -3338,6 +3351,44 @@ function updateStockQty(itemId, val){
   const sum = document.getElementById('stockSummary');
   if(sum){ let grand=0; db.items.forEach(it=>{ const qq=stockQtyFor_(it, month); if(qq) grand += money(qq*avgPriceFor_(it, month, stats).price); });
     const t = sum.querySelector('.ss-total'); if(t) t.textContent = 'NTD ' + money(grand).toLocaleString(); }
+}
+
+// 匯出當月盤點報表（CSV，開頭加BOM讓Excel直接開啟中文不亂碼）
+function exportStockCsv_(){
+  const month = state.stockMonth || stockDefaultMonth_();
+  const stats = buildPurchaseStats_();
+  const esc = v=>{
+    if(typeof v === 'string' && /^[=+\-@]/.test(v)) v = "'" + v;
+    v = String(v==null ? '' : v);
+    return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+  };
+  const supIdx = id=>{ const i = db.suppliers.findIndex(x=>x.id===id); return i<0 ? 9999 : i; };
+  const sorted = db.items.slice().sort((a,b)=> supIdx(a.supplierId)-supIdx(b.supplierId) || (a.sortIndex||0)-(b.sortIndex||0));
+  const rows = [['盤點月份','供應商','品項代碼','品名','單位','盤點數量','平均單價','單價來源','金額']];
+  const bySup = {}; let total = 0, n = 0;
+  sorted.forEach(it=>{
+    const q = stockQtyFor_(it, month); if(!q) return;
+    const ap = avgPriceFor_(it, month, stats);
+    const amt = money(q * ap.price);
+    const s = db.suppliers.find(x=>x.id===it.supplierId);
+    const sname = s ? s.name : '';
+    const src = ap.src==='month' ? '當月實收加權平均' : ap.src==='prev' ? ('沿用'+Number(ap.from.slice(5))+'月平均') : ap.src==='item' ? '品項單價' : '尚無單價';
+    rows.push([month, sname, it.code||'', it.name, it.unit||'', q, ap.price, src, amt]);
+    total += amt; n++; bySup[sname] = (bySup[sname]||0) + amt;
+  });
+  if(!n){ showToast('這個月還沒有盤點數量可以匯出'); return; }
+  rows.push([month,'盤存總額','','','','','','',money(total)]);
+  rows.push([]);
+  rows.push(['供應商小計']);
+  Object.keys(bySup).forEach(k=> rows.push([month, k, '','','','','','', money(bySup[k])]));
+  const csv = '\ufeff' + rows.map(r=>r.map(esc).join(',')).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '盤點報表_' + month + '.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  showToast('已匯出 ' + n + ' 項盤點資料');
 }
 
 /* ---------- 供應商管理 + 異動紀錄 ---------- */
